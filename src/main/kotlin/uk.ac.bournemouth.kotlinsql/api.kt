@@ -28,7 +28,7 @@ import kotlin.reflect.KProperty
  * Created by pdvrieze on 31/03/16.
  */
 
-abstract class Database private constructor(val version:Int, val tables:List<out Table>) {
+abstract class Database private constructor(val _version:Int, val _tables:List<out Table>) {
   constructor(version:Int, block:DatabaseConfiguration.()->Unit):this(version, DatabaseConfiguration().apply(block))
 
   private constructor(version:Int, config:DatabaseConfiguration): this(version, config.tables)
@@ -41,7 +41,7 @@ abstract class Database private constructor(val version:Int, val tables:List<out
     var needsCheck=true
     operator fun getValue(thisRef: Database, property: KProperty<*>): T {
       if (needsCheck) {
-        if (table.name != property.name) throw IllegalArgumentException("The table names do not match (${table.name}, ${property.name})")
+        if (table._name != property.name) throw IllegalArgumentException("The table names do not match (${table._name}, ${property.name})")
         needsCheck = false
       }
       return table
@@ -52,7 +52,7 @@ abstract class Database private constructor(val version:Int, val tables:List<out
 }
 
 interface TableRef {
-  val name:String
+  val _name:String
 }
 
 interface ColumnRef<T:Any> {
@@ -191,7 +191,7 @@ class SimpleLengthColumnConfiguration<T:Any>(table: TableRef, name: String, type
 class ForeignKey constructor(private val fromCols:List<ColumnRef<*>>, private val toTable:TableRef, private val toCols:List<ColumnRef<*>>)
 
 @Suppress("NOTHING_TO_INLINE")
-class TableConfiguration(override val name:String, val extra:String?=null):TableRef {
+class TableConfiguration(override val _name:String, val extra:String?=null):TableRef {
 
   val cols = mutableListOf<Column<*>>()
   var primaryKey: List<ColumnRef<*>>? = null
@@ -321,7 +321,7 @@ class TableConfiguration(override val name:String, val extra:String?=null):Table
       __FOREIGN_KEY__1(this, col1)
 
   fun toTable(): Table {
-    return Table(name, cols, primaryKey, foreignKeys, uniqueKeys, indices, extra)
+    return Table(_name, cols, primaryKey, foreignKeys, uniqueKeys, indices, extra)
   }
 
 }

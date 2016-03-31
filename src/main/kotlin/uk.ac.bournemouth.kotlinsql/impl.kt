@@ -38,13 +38,13 @@ open class ColumnImpl<T:Any>(override val table:TableRef, override val type: Col
   override fun ref():ColumnRef<T> = this
 }
 
-open class Table(override val name: String, val cols: List<out Column<*>>, val primaryKey: List<out ColumnRef<*>>?, foreignKeys: MutableList<ForeignKey>, uniqueKeys: MutableList<List<ColumnRef<*>>>, val indices: List<out List<out ColumnRef<*>>>, val extra: String?) :TableRef{
+open class Table(override val _name: String, val _cols: List<out Column<*>>, val _primaryKey: List<out ColumnRef<*>>?, _foreignKeys: MutableList<ForeignKey>, _uniqueKeys: MutableList<List<ColumnRef<*>>>, val _indices: List<out List<out ColumnRef<*>>>, val _extra: String?) :TableRef{
   constructor(name:String, extra: String? = null, block:TableConfiguration.()->Unit): this(TableConfiguration(name, extra).apply(block)  )
-  constructor(c:TableConfiguration):this(c.name, c.cols, c.primaryKey, c.foreignKeys, c.uniqueKeys, c.indices, c.extra)
+  constructor(c:TableConfiguration):this(c._name, c.cols, c.primaryKey, c.foreignKeys, c.uniqueKeys, c.indices, c.extra)
 
-  fun ref(): TableRef = TableRefImpl(name)
+  fun ref(): TableRef = TableRefImpl(_name)
 
-  fun field(name:String) = cols.firstOrNull {it.name==name}
+  fun field(name:String) = _cols.firstOrNull {it.name==name}
 
   protected fun <T:Any> type(type: ColumnType<T>) = FieldAccessor<T>(type)
 
@@ -66,7 +66,7 @@ open class Table(override val name: String, val cols: List<out Column<*>>, val p
 
 }
 
-class TableRefImpl(override val name: String) : TableRef {}
+class TableRefImpl(override val _name: String) : TableRef {}
 
 
 
