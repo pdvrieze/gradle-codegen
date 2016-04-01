@@ -32,8 +32,14 @@ import kotlin.reflect.KProperty
  * @property _tables The actual tables defined in the database
  */
 
-abstract class Database private constructor(val _version:Int, val _tables:List<out uk.ac.bournemouth.kotlinsql.Table>) {
+abstract class Database private constructor(val _version:Int, val _tables:List<out ImmutableTable>) {
 
+  companion object {
+    private fun tablesFromObjects(container:KClass<out Database>): List<ImmutableTable> {
+      return container.nestedClasses.map { it.objectInstance as? ImmutableTable }.filterNotNull()
+    }
+  }
+  
   /**
    * Constructor for creating a new Database implementation.
    *
@@ -44,23 +50,26 @@ abstract class Database private constructor(val _version:Int, val _tables:List<o
 
   private constructor(version:Int, config:DatabaseConfiguration): this(version, config.tables)
 
+  constructor(version:Int): this(version, mutableListOf()) {
+    (_tables as MutableList<ImmutableTable>).addAll(tablesFromObjects(javaClass.kotlin))
+  }
 
   /**
    * Delegate function to be used to reference tables. Note that this requires the name of the property to match the name
    * of the table.
    */
-  protected inline fun <T: uk.ac.bournemouth.kotlinsql.Table> ref(table: T)= TableDelegate(table)
+  protected inline fun <T: ImmutableTable> ref(table: T)= TableDelegate(table)
 
   /**
    * Delegate function to be used to reference tables. This delegate allows for renaming, by removing the need for checking.
    */
-  protected inline fun <T: uk.ac.bournemouth.kotlinsql.Table> rename(table: T)= TableDelegate(table, false)
+  protected inline fun <T: ImmutableTable> rename(table: T)= TableDelegate(table, false)
 
 
   /**
    * Helper class that implements the actual delegation of table access.
    */
-  protected class TableDelegate<T: uk.ac.bournemouth.kotlinsql.Table>(private val table: T, private var needsCheck:Boolean=true) {
+  protected class TableDelegate<T: ImmutableTable>(private val table: T, private var needsCheck:Boolean=true) {
     operator fun getValue(thisRef: Database, property: KProperty<*>): T {
       if (needsCheck) {
         if (table._name != property.name) throw IllegalArgumentException("The table names do not match (${table._name}, ${property.name})")
@@ -229,6 +238,9 @@ class SimpleLengthColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef
 
 class ForeignKey constructor(private val fromCols:List<ColumnRef<*,*>>, private val toTable:TableRef, private val toCols:List<ColumnRef<*,*>>)
 
+/**
+ * The main class that caries a lot of the load for the class.
+ */
 @Suppress("NOTHING_TO_INLINE")
 class TableConfiguration(override val _name:String, val extra:String?=null):TableRef {
 
@@ -363,16 +375,44 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
 
 class DatabaseConfiguration {
 
-  private class __AnonymousTable(name:String, extra: String?, block:TableConfiguration.()->Unit): uk.ac.bournemouth.kotlinsql.Table(name, extra, block)
+  private class __AnonymousTable(name:String, extra: String?, block:TableConfiguration.()->Unit): ImmutableTable(name, extra, block)
 
-  val tables = mutableListOf<uk.ac.bournemouth.kotlinsql.Table>()
+  val tables = mutableListOf<ImmutableTable>()
 
   fun table(name:String, extra: String? = null, block:TableConfiguration.()->Unit):TableRef {
     return __AnonymousTable(name, extra, block)
   }
 
-  inline fun table(t: uk.ac.bournemouth.kotlinsql.Table):TableRef {
+  inline fun table(t: ImmutableTable):TableRef {
     tables.add(t); return t.ref()
+  }
+
+}
+/**
+ * A interface for tables. The properties have underscored names to reduce conflicts with members.
+ *
+ * @property _cols The list of columns in the table.
+ * @property _primaryKey The primary key of the table (if defined)
+ * @property _foreignKeys The foreign keys defined on the table.
+ * @property _uniqueKeys Unique keys / uniqueness constraints defined on the table
+ * @property _indices Additional indices defined on the table
+ * @property _extra Extra table configuration to be appended after the definition. This contains information such as the
+ *                  engine or charset to use.
+ */
+interface Table:TableRef {
+  val _cols: List<Column<*, *>>
+  val _primaryKey: List<Column<*, *>>?
+  val _foreignKeys: List<ForeignKey>
+  val _uniqueKeys: List<List<Column<*, *>>>
+  val _indices: List<List<Column<*, *>>>
+  val _extra: String?
+
+  fun field(name:String): Column<*,*>?
+  fun ref(): TableRef
+  fun resolve(ref: ColumnRef<*, *>): Column<*, *>
+
+  interface FieldAccessor<T:Any, S:ColumnType<T,S>> {
+    operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): Column<T, S>
   }
 
 }
@@ -383,7 +423,7 @@ class DatabaseConfiguration {
  *
  * A sample use is:
  * ```
- *    object peopleTable:Table("people", "ENGINE=InnoDB CHARSET=utf8", {
+ *    object peopleTable:[ImmutableTable]("people", "ENGINE=InnoDB CHARSET=utf8", {
  *      val firstname = [VARCHAR]("firstname", 50)
  *      val familyname = [VARCHAR]("familyname", 30) { NOT_NULL }
  *      [DATE]("birthdate")
@@ -407,61 +447,24 @@ class DatabaseConfiguration {
  * @property _extra Extra table configuration to be appended after the definition. This contains information such as the
  *                  engine or charset to use.
  */
-abstract class Table private constructor(override val _name: String,
-                                         val _cols: List<uk.ac.bournemouth.kotlinsql.Column<*, *>>,
-                                         val _primaryKey: List<uk.ac.bournemouth.kotlinsql.Column<*, *>>?,
-                                         val _foreignKeys: List<uk.ac.bournemouth.kotlinsql.ForeignKey>,
-                                         val _uniqueKeys: List<List<uk.ac.bournemouth.kotlinsql.Column<*, *>>>,
-                                         val _indices: List<List<uk.ac.bournemouth.kotlinsql.Column<*, *>>>,
-                                         val _extra: String?) : uk.ac.bournemouth.kotlinsql.TableRef {
+abstract class ImmutableTable private constructor(override val _name: String,
+                                                  override val _cols: List<Column<*, *>>,
+                                                  override val _primaryKey: List<Column<*, *>>?,
+                                                  override val _foreignKeys: List<ForeignKey>,
+                                                  override val _uniqueKeys: List<List<Column<*, *>>>,
+                                                  override val _indices: List<List<Column<*, *>>>,
+                                                  override val _extra: String?) : AbstractTable() {
 
-  private constructor(c: uk.ac.bournemouth.kotlinsql.TableConfiguration):this(c._name, c.cols, c.primaryKey?.let {c.cols.resolve(it)}, c.foreignKeys, c.uniqueKeys.map({c.cols.resolve(it)}), c.indices.map({c.cols.resolve(it)}), c.extra)
+  private constructor(c: TableConfiguration):this(c._name, c.cols, c.primaryKey?.let {c.cols.resolve(it)}, c.foreignKeys, c.uniqueKeys.map({c.cols.resolve(it)}), c.indices.map({c.cols.resolve(it)}), c.extra)
 
   /**
    * The main use of this class is through inheriting this constructor.
    */
-  constructor(name:String, extra: String? = null, block: uk.ac.bournemouth.kotlinsql.TableConfiguration.()->Unit): this(
-        uk.ac.bournemouth.kotlinsql.TableConfiguration(name, extra).apply(block)  )
+  constructor(name:String, extra: String? = null, block: TableConfiguration.()->Unit): this(
+        TableConfiguration(name, extra).apply(block)  )
 
-  companion object {
-
-    private fun List<uk.ac.bournemouth.kotlinsql.Column<*, *>>.resolve(ref: uk.ac.bournemouth.kotlinsql.ColumnRef<*,*>) = find { it.name == ref.name } ?: throw java.util.NoSuchElementException(
-          "No column with the name ${ref.name} could be found")
-
-    private fun List<uk.ac.bournemouth.kotlinsql.Column<*, *>>.resolve(refs: List<uk.ac.bournemouth.kotlinsql.ColumnRef<*,*>>) = refs.map { resolve(it) }
-
-  }
-
-  fun resolve(ref: uk.ac.bournemouth.kotlinsql.ColumnRef<*,*>) : uk.ac.bournemouth.kotlinsql.Column<*, *> = (_cols.find {it.name==ref.name}) !!
-
-  fun ref(): uk.ac.bournemouth.kotlinsql.TableRef = uk.ac.bournemouth.kotlinsql.TableRefImpl(_name)
-
-  fun field(name:String) = _cols.firstOrNull {it.name==name}
-
-  operator fun <T:Any, S: ColumnType<T, S>> get(thisRef: uk.ac.bournemouth.kotlinsql.Table, property: kotlin.reflect.KProperty<out uk.ac.bournemouth.kotlinsql.Column<T, S>>): uk.ac.bournemouth.kotlinsql.Column<T, S> {
-    return field(property.name) as uk.ac.bournemouth.kotlinsql.Column<T, S>
-  }
-
-  protected fun <T:Any, S: ColumnType<T, S>> type(type: uk.ac.bournemouth.kotlinsql.ColumnType<T, S>) = uk.ac.bournemouth.kotlinsql.Table.FieldAccessor<T, S>(
+  protected fun <T:Any, S: ColumnType<T, S>> type(type: ColumnType<T, S>) = TypeFieldAccessor<T, S>(
         type)
-
-  open protected class FieldAccessor<T:Any, S: ColumnType<T, S>>(val type: uk.ac.bournemouth.kotlinsql.ColumnType<T, S>) {
-    lateinit var value: uk.ac.bournemouth.kotlinsql.Column<T, S>
-    open fun name(property: kotlin.reflect.KProperty<*>) = property.name
-    operator fun getValue(thisRef: uk.ac.bournemouth.kotlinsql.Table, property: kotlin.reflect.KProperty<*>): uk.ac.bournemouth.kotlinsql.Column<T, S> {
-      if (value==null) {
-        value = type.cast(thisRef.field(property.name)?: throw IllegalArgumentException("There is no field with the given name ${property.name}"))
-      }
-      return value
-    }
-  }
-
-  protected fun <T:Any, S: ColumnType<T, S>> name(name:String, type: uk.ac.bournemouth.kotlinsql.ColumnType<T, S>) = uk.ac.bournemouth.kotlinsql.Table.NamedFieldAccessor<T, S>(
-        name,
-        type)
-
-  final protected class NamedFieldAccessor<T:Any, S: ColumnType<T, S>>(val name:String, type: uk.ac.bournemouth.kotlinsql.ColumnType<T, S>): uk.ac.bournemouth.kotlinsql.Table.FieldAccessor<T, S>(type) {
-    override fun name(property: kotlin.reflect.KProperty<*>): String = this.name
-  }
 
 }
+

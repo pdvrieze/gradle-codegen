@@ -20,6 +20,8 @@
 
 package uk.ac.bournemouth.kotlinsql
 
+import kotlin.reflect.KProperty
+
 /**
  * Implementation for the database API
  */
@@ -55,5 +57,48 @@ open class ColumnImpl<T:Any, S: ColumnType<T, S>>(
 class TableRefImpl(override val _name: String) : TableRef {}
 
 
+abstract class AbstractTable: Table {
 
+  companion object {
+
+    fun List<Column<*, *>>.resolve(ref: ColumnRef<*,*>) = find { it.name == ref.name } ?: throw java.util.NoSuchElementException(
+          "No column with the name ${ref.name} could be found")
+
+    fun List<Column<*, *>>.resolve(refs: List<ColumnRef<*,*>>) = refs.map { resolve(it) }
+
+    fun List<Column<*, *>>.resolve(refs: Array<out ColumnRef<*,*>>) = refs.map { resolve(it) }
+
+  }
+
+  override fun resolve(ref: ColumnRef<*,*>) : Column<*, *> = (_cols.find {it.name==ref.name}) !!
+
+  override fun ref(): TableRef = TableRefImpl(_name)
+
+  override fun field(name:String) = _cols.firstOrNull {it.name==name}
+
+  operator fun <T:Any, S: ColumnType<T, S>> getValue(thisRef: ImmutableTable, property: KProperty<*>): Column<T, S> {
+    return field(property.name) as Column<T, S>
+  }
+
+  open protected class TypeFieldAccessor<T:Any, S: ColumnType<T, S>>(val type: ColumnType<T, S>): Table.FieldAccessor<T, S> {
+    lateinit var value: Column<T, S>
+    open fun name(property: kotlin.reflect.KProperty<*>) = property.name
+    override operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): Column<T, S> {
+      if (value==null) {
+        value = type.cast(thisRef.field(property.name)?: throw IllegalArgumentException("There is no field with the given name ${property.name}"))
+      }
+      return value
+    }
+  }
+
+  /** Property delegator to access database columns by name and type. */
+  protected fun <T:Any, S: ColumnType<T, S>> name(name:String, type: ColumnType<T, S>) = NamedFieldAccessor<T, S>(
+        name,
+        type)
+
+  final protected class NamedFieldAccessor<T:Any, S: ColumnType<T, S>>(val name:String, type: ColumnType<T, S>): TypeFieldAccessor<T, S>(type) {
+    override fun name(property: kotlin.reflect.KProperty<*>): String = this.name
+  }
+
+}
 
