@@ -22,6 +22,10 @@ package uk.ac.bournemouth.kotlinsql
 
 import kotlin.reflect.KProperty
 import uk.ac.bournemouth.kotlinsql.ColumnType.*
+import uk.ac.bournemouth.kotlinsql.AbstractColumnConfiguration.*
+import uk.ac.bournemouth.kotlinsql.AbstractColumnConfiguration.AbstractNumberColumnConfiguration.*
+import uk.ac.bournemouth.kotlinsql.AbstractColumnConfiguration.AbstractCharColumnConfiguration.*
+
 
 
 internal val LINE_SEPARATOR: String by lazy { System.getProperty("line.separator")!! }
@@ -31,15 +35,27 @@ internal interface AllColumns<T:Any, S: BaseColumnType<T,S>>: DecimalColumn<T,S>
  * Implementation for the database API
  */
 
-fun <T:Any, S: BaseColumnType<T, S>, C:Column<T,S>>ColumnImpl(configuration: AbstractColumnConfiguration<T,S,C>): ColumnImpl<T,S,C> {
+fun <T:Any, S: BaseColumnType<T, S>, C:Column<T,S>>ColumnImpl(configuration: AbstractColumnConfiguration<T, S, C>): ColumnImpl<T,S,C> {
+// These helper functions are needed as the generic type inference is not quite complete
+  fun <T:Any, S:BaseColumnType<T,S>, C: Column<T,S>> numberHelper(configuration: AbstractNumberColumnConfiguration<T,S,*>): ColumnImpl<T,S,C> {
+    return when(configuration) {
+      is NumberColumnConfiguration     -> ColumnImpl(configuration.name, configuration)
+      is DecimalColumnConfiguration    -> ColumnImpl(configuration.name, configuration)
+    }
+  }
+
+  fun <T:Any, S:BaseColumnType<T,S>, C: Column<T,S>> charHelper(configuration: AbstractCharColumnConfiguration<T,S,*>): ColumnImpl<T,S,C> {
+    return when(configuration) {
+      is CharColumnConfiguration     -> ColumnImpl(configuration.name, configuration)
+      is LengthCharColumnConfiguration    -> ColumnImpl(configuration.name, configuration)
+    }
+  }
+
   return when (configuration) {
     is NormalColumnConfiguration     -> ColumnImpl(configuration.name, configuration)
-    is NumberColumnConfiguration     -> ColumnImpl(configuration.name, configuration)
-    is DecimalColumnConfiguration    -> ColumnImpl(configuration.name, configuration)
-    is CharColumnConfiguration       -> ColumnImpl(configuration.name, configuration)
+    is AbstractNumberColumnConfiguration -> numberHelper(configuration)
+    is AbstractCharColumnConfiguration -> charHelper(configuration)
     is LengthColumnConfiguration     -> ColumnImpl(configuration.name, configuration)
-    is LengthCharColumnConfiguration -> ColumnImpl(configuration.name, configuration)
-    else                             -> throw IllegalArgumentException("The given type is not supported")
   }
 }
 
@@ -170,7 +186,29 @@ open class ColumnImpl<T:Any, S: BaseColumnType<T, S>, out C:Column<T,S>> private
 
   override fun toDDL(): CharSequence {
     val result = StringBuilder()
-    result.append('`').append(name).append("` ").append(type.typeName)
+    result.apply {
+      append('`').append(name).append("` ").append(type.typeName)
+      if (this@ColumnImpl.length>0) append('(').append(this@ColumnImpl.length).append(')')
+      else if (displayLength>0) append('(').append(displayLength).append(')')
+      if (unsigned) append(" UNSIGNED")
+      if (zerofill) append(" ZEROFILL")
+      if (binary) append(" BINARY")
+      charset?.let { append(" CHARACTER SET ").append(it)}
+      collation?.let { append(" COLLATE ").append(it)}
+      notnull?.let { append(if(it) " NOT NULL" else "NULL") }
+      default?.let { append(" DEFAULT ")
+        if (it is CharSequence)
+          append('\'').append(it).append('\'')
+        else append(it)
+      }
+      if (autoincrement) append(" AUTO_INCREMENT")
+      if (unique) append(" UNIQUE")
+      comment?.let { append(" '").append(comment).append('\'') }
+      columnFormat?.let { append(" COLUMN_FORMAT ").append(it.name)}
+      storageFormat?.let { append(" STORAGE ").append(it.name)}
+      references?.let { append(" REFERENCES ").append(toDDL(it.table._name, it.columns)) }
+
+    }
 
     return result
   }
@@ -224,10 +262,6 @@ abstract class AbstractTable: Table {
     override fun name(property: kotlin.reflect.KProperty<*>): String = this.name
   }
 
-  private fun toDDL(first:CharSequence, cols: List<Column<*,*>>):CharSequence {
-    return StringBuilder(first).append(" (`").apply { cols.joinTo(this, "`, `", transform = {it.name}) }.append("`)")
-  }
-
   override fun appendDDL(appendable: Appendable) {
     appendable.appendln("CREATE TABLE `${_name}` (")
     sequenceOf(_cols.asSequence().map {it.toDDL()},
@@ -237,9 +271,14 @@ abstract class AbstractTable: Table {
                _foreignKeys.asSequence().map { it.toDDL() })
           .filterNotNull()
           .flatten()
-          .joinTo(appendable, ",${LINE_SEPARATOR}  ")
+          .joinTo(appendable, ",${LINE_SEPARATOR}  ", "  ")
     appendable.appendln().append(')')
     _extra?.let { appendable.append(' ').append(_extra)}
+    appendable.append(';')
   }
 }
 
+
+internal fun toDDL(first:CharSequence, cols: List<ColumnRef<*,*>>):CharSequence {
+  return StringBuilder(first).append(" (`").apply { cols.joinTo(this, "`, `", transform = {it.name}) }.append("`)")
+}
