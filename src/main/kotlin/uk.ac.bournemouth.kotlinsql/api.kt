@@ -25,20 +25,41 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KProperty
 
 /**
- * Created by pdvrieze on 31/03/16.
+ * This is an abstract class that contains a set of database tables.
+ *
+ * @property _version The version of the database schema. This can in the future be used for updating
+ * @property _tables The actual tables defined in the database
  */
 
-abstract class Database private constructor(val _version:Int, val _tables:List<out Table>) {
+abstract class Database private constructor(val _version:Int, val _tables:List<out uk.ac.bournemouth.kotlinsql.Table>) {
+
+  /**
+   * Constructor for creating a new Database implementation.
+   *
+   * @param version The version of the database configuration.
+   * @param block The configuration block where the database tables are added.
+   */
   constructor(version:Int, block:DatabaseConfiguration.()->Unit):this(version, DatabaseConfiguration().apply(block))
 
   private constructor(version:Int, config:DatabaseConfiguration): this(version, config.tables)
 
 
-  protected inline fun <T:Table> ref(table: T)= TableDelegate<T>(table)
+  /**
+   * Delegate function to be used to reference tables. Note that this requires the name of the property to match the name
+   * of the table.
+   */
+  protected inline fun <T: uk.ac.bournemouth.kotlinsql.Table> ref(table: T)= TableDelegate(table)
+
+  /**
+   * Delegate function to be used to reference tables. This delegate allows for renaming, by removing the need for checking.
+   */
+  protected inline fun <T: uk.ac.bournemouth.kotlinsql.Table> rename(table: T)= TableDelegate(table, false)
 
 
-  protected class TableDelegate<T:Table>(private val table: T) {
-    var needsCheck=true
+  /**
+   * Helper class that implements the actual delegation of table access.
+   */
+  protected class TableDelegate<T: uk.ac.bournemouth.kotlinsql.Table>(private val table: T, private var needsCheck:Boolean=true) {
     operator fun getValue(thisRef: Database, property: KProperty<*>): T {
       if (needsCheck) {
         if (table._name != property.name) throw IllegalArgumentException("The table names do not match (${table._name}, ${property.name})")
@@ -57,6 +78,13 @@ interface TableRef {
   val _name:String
 }
 
+/**
+ * A reference to a column.
+ *
+ * @param table The table the column is a part of
+ * @param name The name of the column
+ * @param type The [ColumnType] of the column.
+ */
 interface ColumnRef<T:Any> {
   val table: TableRef
   val name:String
@@ -334,16 +362,105 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
 
 class DatabaseConfiguration {
 
-  private class __AnonymousTable(name:String, extra: String?, block:TableConfiguration.()->Unit): Table(name,extra, block)
+  private class __AnonymousTable(name:String, extra: String?, block:TableConfiguration.()->Unit): uk.ac.bournemouth.kotlinsql.Table(name, extra, block)
 
-  val tables = mutableListOf<Table>()
+  val tables = mutableListOf<uk.ac.bournemouth.kotlinsql.Table>()
 
   fun table(name:String, extra: String? = null, block:TableConfiguration.()->Unit):TableRef {
     return __AnonymousTable(name, extra, block)
   }
 
-  inline fun table(t:Table):TableRef {
+  inline fun table(t: uk.ac.bournemouth.kotlinsql.Table):TableRef {
     tables.add(t); return t.ref()
+  }
+
+}
+
+/**
+ * A base class for table declarations. Users of the code are expected to use this with a configuration closure to create
+ * database tables. for typed columns to be available they need to be declared using `by [type]` or `by [name]`.
+ *
+ * A sample use is:
+ * ```
+ *    object peopleTable:Table("people", "ENGINE=InnoDB CHARSET=utf8", {
+ *      val firstname = [VARCHAR]("firstname", 50)
+ *      val familyname = [VARCHAR]("familyname", 30) { NOT_NULL }
+ *      [DATE]("birthdate")
+ *      [PRIMARY_KEY](firstname, familyname)
+ *    }) {
+ *      val firstname by [type]([ColumnType.VARCHAR_T])
+ *      val surname by [name]("familyname", [ColumnType.VARCHAR_T])
+ *      val birthdate by [type]([ColumnType.DATE_T])
+ *    }
+ * ```
+ *
+ * Note that the definition of typed fields through delegates is mainly to aid programmatic access. Values within the
+ * configurator body are only visible there, and mainly serve to make definition of keys easy. Values that are not used
+ * (such as birthdate) do not need to be stored. Their mere declaration adds them to the table configuration.
+ *
+ * @property _cols The list of columns in the table.
+ * @property _primaryKey The primary key of the table (if defined)
+ * @property _foreignKeys The foreign keys defined on the table.
+ * @property _uniqueKeys Unique keys / uniqueness constraints defined on the table
+ * @property _indices Additional indices defined on the table
+ * @property _extra Extra table configuration to be appended after the definition. This contains information such as the
+ *                  engine or charset to use.
+ */
+abstract class Table private constructor(override val _name: String,
+                                         val _cols: List<uk.ac.bournemouth.kotlinsql.Column<*>>,
+                                         val _primaryKey: List<uk.ac.bournemouth.kotlinsql.Column<*>>?,
+                                         val _foreignKeys: List<uk.ac.bournemouth.kotlinsql.ForeignKey>,
+                                         val _uniqueKeys: List<List<uk.ac.bournemouth.kotlinsql.Column<*>>>,
+                                         val _indices: List<List<uk.ac.bournemouth.kotlinsql.Column<*>>>,
+                                         val _extra: String?) : uk.ac.bournemouth.kotlinsql.TableRef {
+
+  private constructor(c: uk.ac.bournemouth.kotlinsql.TableConfiguration):this(c._name, c.cols, c.primaryKey?.let {c.cols.resolve(it)}, c.foreignKeys, c.uniqueKeys.map({c.cols.resolve(it)}), c.indices.map({c.cols.resolve(it)}), c.extra)
+
+  /**
+   * The main use of this class is through inheriting this constructor.
+   */
+  constructor(name:String, extra: String? = null, block: uk.ac.bournemouth.kotlinsql.TableConfiguration.()->Unit): this(
+        uk.ac.bournemouth.kotlinsql.TableConfiguration(name, extra).apply(block)  )
+
+  companion object {
+
+    private fun List<uk.ac.bournemouth.kotlinsql.Column<*>>.resolve(ref: uk.ac.bournemouth.kotlinsql.ColumnRef<*>) = find { it.name == ref.name } ?: throw java.util.NoSuchElementException(
+          "No column with the name ${ref.name} could be found")
+
+    private fun List<uk.ac.bournemouth.kotlinsql.Column<*>>.resolve(refs: List<uk.ac.bournemouth.kotlinsql.ColumnRef<*>>) = refs.map { resolve(it) }
+
+  }
+
+  fun resolve(ref: uk.ac.bournemouth.kotlinsql.ColumnRef<*>) : uk.ac.bournemouth.kotlinsql.Column<*> = (_cols.find {it.name==ref.name}) !!
+
+  fun ref(): uk.ac.bournemouth.kotlinsql.TableRef = uk.ac.bournemouth.kotlinsql.TableRefImpl(_name)
+
+  fun field(name:String) = _cols.firstOrNull {it.name==name}
+
+  operator fun <T:Any> get(thisRef: uk.ac.bournemouth.kotlinsql.Table, property: kotlin.reflect.KProperty<out uk.ac.bournemouth.kotlinsql.Column<T>>): uk.ac.bournemouth.kotlinsql.Column<T> {
+    return field(property.name) as uk.ac.bournemouth.kotlinsql.Column<T>
+  }
+
+  protected fun <T:Any> type(type: uk.ac.bournemouth.kotlinsql.ColumnType<T>) = uk.ac.bournemouth.kotlinsql.Table.FieldAccessor<T>(
+        type)
+
+  open protected class FieldAccessor<T:Any>(val type: uk.ac.bournemouth.kotlinsql.ColumnType<T>) {
+    lateinit var value: uk.ac.bournemouth.kotlinsql.Column<T>
+    open fun name(property: kotlin.reflect.KProperty<*>) = property.name
+    operator fun getValue(thisRef: uk.ac.bournemouth.kotlinsql.Table, property: kotlin.reflect.KProperty<*>): uk.ac.bournemouth.kotlinsql.Column<T> {
+      if (value==null) {
+        value = type.cast(thisRef.field(property.name)?: throw IllegalArgumentException("There is no field with the given name ${property.name}"))
+      }
+      return value
+    }
+  }
+
+  protected fun <T:Any> name(name:String, type: uk.ac.bournemouth.kotlinsql.ColumnType<T>) = uk.ac.bournemouth.kotlinsql.Table.NamedFieldAccessor<T>(
+        name,
+        type)
+
+  final protected class NamedFieldAccessor<T:Any>(val name:String, type: uk.ac.bournemouth.kotlinsql.ColumnType<T>): uk.ac.bournemouth.kotlinsql.Table.FieldAccessor<T>(type) {
+    override fun name(property: kotlin.reflect.KProperty<*>): String = this.name
   }
 
 }
