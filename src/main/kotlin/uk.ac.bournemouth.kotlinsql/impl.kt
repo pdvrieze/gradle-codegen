@@ -26,10 +26,22 @@ import uk.ac.bournemouth.kotlinsql.ColumnType.*
 
 internal val LINE_SEPARATOR: String by lazy { System.getProperty("line.separator")!! }
 
-internal interface AllColumns<T:Any, S: BaseColumnType<T,S>>: DecimalColumn<T,S>
+internal interface AllColumns<T:Any, S: BaseColumnType<T,S>>: DecimalColumn<T,S>, LengthCharColumn<T,S>
 /**
  * Implementation for the database API
  */
+
+fun <T:Any, S: BaseColumnType<T, S>, C:Column<T,S>>ColumnImpl(configuration: AbstractColumnConfiguration<T,S,C>): ColumnImpl<T,S,C> {
+  return when (configuration) {
+    is NormalColumnConfiguration     -> ColumnImpl(configuration.name, configuration)
+    is NumberColumnConfiguration     -> ColumnImpl(configuration.name, configuration)
+    is DecimalColumnConfiguration    -> ColumnImpl(configuration.name, configuration)
+    is CharColumnConfiguration       -> ColumnImpl(configuration.name, configuration)
+    is LengthColumnConfiguration     -> ColumnImpl(configuration.name, configuration)
+    is LengthCharColumnConfiguration -> ColumnImpl(configuration.name, configuration)
+    else                             -> throw IllegalArgumentException("The given type is not supported")
+  }
+}
 
 open class ColumnImpl<T:Any, S: BaseColumnType<T, S>, out C:Column<T,S>> private constructor (
       override val table: TableRef,
@@ -40,19 +52,23 @@ open class ColumnImpl<T:Any, S: BaseColumnType<T, S>, out C:Column<T,S>> private
       override val autoincrement: Boolean,
       override val default: T?,
       override val comment: String?,
-      override val columnFormat: ColumnConfiguration.ColumnFormat?,
-      override val storageFormat: ColumnConfiguration.StorageFormat?,
+      override val columnFormat: AbstractColumnConfiguration.ColumnFormat?,
+      override val storageFormat: AbstractColumnConfiguration.StorageFormat?,
       override val references: ColsetRef?,
       override val unsigned:Boolean = false,
       override val zerofill: Boolean = false,
       override val displayLength: Int = -1,
       override val precision: Int = -1,
-      override val scale:Int = -1
+      override val scale:Int = -1,
+      override val charset:String? = null,
+      override val collation:String? = null,
+      override val binary:Boolean = false,
+      override val length:Int = -1
 ) : AllColumns<T, S> {
-  constructor(configuration: ColumnConfiguration<T, S, *>):
+  constructor(name:String, configuration: NormalColumnConfiguration<T, S>):
       this(table=configuration.table,
            type=configuration.type,
-           name=configuration.name,
+           name=name,
            notnull=configuration.notnull,
            unique=configuration.unique,
            autoincrement=configuration.autoincrement,
@@ -62,10 +78,24 @@ open class ColumnImpl<T:Any, S: BaseColumnType<T, S>, out C:Column<T,S>> private
            storageFormat=configuration.storageFormat,
            references=configuration.references)
 
-  constructor(configuration: NumberColumnConfiguration<T, S, NumericColumn<T,S>>):
+  constructor(name:String, configuration: LengthColumnConfiguration<T, S>):
   this(table=configuration.table,
        type=configuration.type,
-       name=configuration.name,
+       name=name,
+       notnull=configuration.notnull,
+       unique=configuration.unique,
+       autoincrement=configuration.autoincrement,
+       default=configuration.default,
+       comment=configuration.comment,
+       columnFormat=configuration.columnFormat,
+       storageFormat=configuration.storageFormat,
+       references=configuration.references,
+       length = configuration.length)
+
+  constructor(name:String, configuration: NumberColumnConfiguration<T, S>):
+  this(table=configuration.table,
+       type=configuration.type,
+       name=name,
        notnull=configuration.notnull,
        unique=configuration.unique,
        autoincrement=configuration.autoincrement,
@@ -78,7 +108,43 @@ open class ColumnImpl<T:Any, S: BaseColumnType<T, S>, out C:Column<T,S>> private
        zerofill=configuration.zerofill,
        displayLength=configuration.displayLength)
 
-  constructor(configuration: DecimalColumnConfiguration<T, S>):
+
+  constructor(name:String, configuration: CharColumnConfiguration<T, S>):
+  this(table=configuration.table,
+       type=configuration.type,
+       name=name,
+       notnull=configuration.notnull,
+       unique=configuration.unique,
+       autoincrement=configuration.autoincrement,
+       default=configuration.default,
+       comment=configuration.comment,
+       columnFormat=configuration.columnFormat,
+       storageFormat=configuration.storageFormat,
+       references=configuration.references,
+       binary=configuration.binary,
+       charset=configuration.charset,
+       collation=configuration.collation)
+
+
+  constructor(name:String, configuration: LengthCharColumnConfiguration<T, S>):
+  this(table=configuration.table,
+       type=configuration.type,
+       name=name,
+       notnull=configuration.notnull,
+       unique=configuration.unique,
+       autoincrement=configuration.autoincrement,
+       default=configuration.default,
+       comment=configuration.comment,
+       columnFormat=configuration.columnFormat,
+       storageFormat=configuration.storageFormat,
+       references=configuration.references,
+       length=configuration.length,
+       binary=configuration.binary,
+       charset=configuration.charset,
+       collation=configuration.collation)
+
+
+  constructor(name:String, configuration: DecimalColumnConfiguration<T, S>):
   this(table=configuration.table,
        type=configuration.type,
        name=configuration.name,
@@ -131,10 +197,10 @@ abstract class AbstractTable: Table {
 
   override fun ref(): TableRef = TableRefImpl(_name)
 
-  override fun field(name:String) = _cols.firstOrNull {it.name==name}
+  override fun column(name:String) = _cols.firstOrNull {it.name==name}
 
   operator fun <T:Any, S: BaseColumnType<T, S>> getValue(thisRef: ImmutableTable, property: KProperty<*>): Column<T, S> {
-    return field(property.name) as Column<T, S>
+    return column(property.name) as Column<T, S>
   }
 
   open protected class TypeFieldAccessor<T:Any, S: BaseColumnType<T, S>, C:Column<T,S>>(val type: BaseColumnType<T, S>): Table.FieldAccessor<T, S, C> {
@@ -142,7 +208,7 @@ abstract class AbstractTable: Table {
     open fun name(property: kotlin.reflect.KProperty<*>) = property.name
     override operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): C {
       if (value==null) {
-        val field = thisRef.field(property.name) ?: throw IllegalArgumentException("There is no field with the given name ${property.name}")
+        val field = thisRef.column(property.name) ?: throw IllegalArgumentException("There is no field with the given name ${property.name}")
         value = type.cast(field) as C
       }
       return value!!
@@ -159,7 +225,7 @@ abstract class AbstractTable: Table {
   }
 
   private fun toDDL(first:CharSequence, cols: List<Column<*,*>>):CharSequence {
-    return StringBuilder(first).append(" (`").apply { cols.joinTo(this, "`, `") }.append("`)")
+    return StringBuilder(first).append(" (`").apply { cols.joinTo(this, "`, `", transform = {it.name}) }.append("`)")
   }
 
   override fun appendDDL(appendable: Appendable) {
