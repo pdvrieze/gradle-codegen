@@ -123,7 +123,7 @@ interface BoundedType {
   val maxLen:Int
 }
 
-sealed class ColumnType<T:Any, S: ColumnType<T, S>>(val typeName:String, type: KClass<T>) {
+sealed class ColumnType<T:Any, S: ColumnType<T, S>>(val typeName:String, val type: KClass<T>) {
 
   @Suppress("UNCHECKED")
   fun cast(column: Column<*,*>): Column<T, S> {
@@ -132,6 +132,10 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S>>(val typeName:String, type: K
     } else {
       throw TypeCastException("The given column is not of the correct type")
     }
+  }
+
+  fun cast(value:Any): T {
+    return type.java.cast(value)
   }
 
   object BIT_T       : ColumnType<Boolean, BIT_T>("BIT", Boolean::class), BoundedType { override val maxLen = 64 }
