@@ -220,7 +220,15 @@ interface NumericColumn<T:Any, S: ColumnType<T, S>>: Column<T,S> {
   val displayLength: Int
 }
 
-open class CharColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S): ColumnConfiguration<T, S>(table, name, type) {
+
+interface CharColumn<T:Any, S: ColumnType<T, S>>: Column<T, S> {
+  val charset: String?
+  val collation: String?
+  val binary: Boolean
+}
+
+
+open class CharColumnConfiguration<T:Any, S: ColumnType<T,S>, C:CharColumn<T,S>>(table: TableRef, name: String, type: S): ColumnConfiguration<T, S>(table, name, type) {
   var charset: String? = null
   var collation: String? = null
   var binary:Boolean = false
@@ -231,7 +239,11 @@ open class CharColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, n
   inline fun COLLATE(collation:String) { this.collation = collation }
 }
 
-final class LengthCharColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, override val length: Int): CharColumnConfiguration<T, S>(table, name, type), LengthColumnConfiguration<T, S>
+
+interface LengthCharColumn<T:Any, S: ColumnType<T, S>>: CharColumn<T, S>,LengthColumn<T, S>
+
+
+final class LengthCharColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, override val length: Int): CharColumnConfiguration<T, S, LengthCharColumn<T,S>>(table, name, type), LengthColumnConfiguration<T, S, LengthCharColumn<T,S>>
 
 
 interface DecimalColumn<T:Any, S: ColumnType<T, S>>: NumericColumn<T, S> {
@@ -245,11 +257,15 @@ final class DecimalColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRe
   val defaultScale=0
 }
 
-interface LengthColumnConfiguration<T:Any, S: ColumnType<T,S>> {
+interface LengthColumn<T:Any, S: ColumnType<T, S>>: Column<T, S> {
   val length:Int
 }
 
-class SimpleLengthColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, override val length: Int): ColumnConfiguration<T, S>(table, name, type), LengthColumnConfiguration<T, S>
+interface LengthColumnConfiguration<T:Any, S: ColumnType<T,S>, C:LengthColumn<T,S>> {
+  val length:Int
+}
+
+final class SimpleLengthColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, override val length: Int): ColumnConfiguration<T, S>(table, name, type), LengthColumnConfiguration<T, S, LengthColumn<T,S>>
 
 class ForeignKey constructor(private val fromCols:List<ColumnRef<*,*>>, private val toTable:TableRef, private val toCols:List<ColumnRef<*,*>>) {
   internal fun toDDL(): CharSequence {
@@ -293,16 +309,16 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
   inline fun YEAR(name:String, block: ColumnConfiguration<java.sql.Date, YEAR_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.YEAR_T).add(block)
   inline fun CHAR(name:String, length:Int = -1, block: LengthCharColumnConfiguration<String, CHAR_T>.() -> Unit) = LengthCharColumnConfiguration(this, name, ColumnType.CHAR_T, length).add(block)
   inline fun VARCHAR(name:String, length:Int, block: LengthCharColumnConfiguration<String, VARCHAR_T>.() -> Unit) = LengthCharColumnConfiguration(this, name, ColumnType.VARCHAR_T, length).add(block)
-  inline fun BINARY(name:String, length:Int, block: LengthColumnConfiguration<ByteArray, BINARY_T>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.BINARY_T, length).add(block)
-  inline fun VARBINARY(name:String, length:Int, block: LengthColumnConfiguration<ByteArray, VARBINARY_T>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.VARBINARY_T, length).add(block)
+  inline fun BINARY(name:String, length:Int, block: LengthColumnConfiguration<ByteArray, BINARY_T, LengthColumn<ByteArray, BINARY_T>>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.BINARY_T, length).add(block)
+  inline fun VARBINARY(name:String, length:Int, block: LengthColumnConfiguration<ByteArray, VARBINARY_T, LengthColumn<ByteArray, VARBINARY_T>>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.VARBINARY_T, length).add(block)
   inline fun TINYBLOB(name:String, block: ColumnConfiguration<ByteArray, TINYBLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TINYBLOB_T).add(block)
   inline fun BLOB(name:String, block: ColumnConfiguration<ByteArray, BLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BLOB_T).add(block)
   inline fun MEDIUMBLOB(name:String, block: ColumnConfiguration<ByteArray, MEDIUMBLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.MEDIUMBLOB_T).add(block)
   inline fun LONGBLOB(name:String, block: ColumnConfiguration<ByteArray, LONGBLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.LONGBLOB_T).add(block)
-  inline fun TINYTEXT(name:String, block: CharColumnConfiguration<String, TINYTEXT_T>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.TINYTEXT_T).add(block)
-  inline fun TEXT(name:String, block: CharColumnConfiguration<String, TEXT_T>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.TEXT_T).add(block)
-  inline fun MEDIUMTEXT(name:String, block: CharColumnConfiguration<String, MEDIUMTEXT_T>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.MEDIUMTEXT_T).add(block)
-  inline fun LONGTEXT(name:String, block: CharColumnConfiguration<String, LONGTEXT_T>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.LONGTEXT_T).add(block)
+  inline fun TINYTEXT(name:String, block: CharColumnConfiguration<String, TINYTEXT_T, CharColumn<String, TINYTEXT_T>>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.TINYTEXT_T).add(block)
+  inline fun TEXT(name:String, block: CharColumnConfiguration<String, TEXT_T, CharColumn<String, TEXT_T>>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.TEXT_T).add(block)
+  inline fun MEDIUMTEXT(name:String, block: CharColumnConfiguration<String, MEDIUMTEXT_T, CharColumn<String, MEDIUMTEXT_T>>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.MEDIUMTEXT_T).add(block)
+  inline fun LONGTEXT(name:String, block: CharColumnConfiguration<String, LONGTEXT_T, CharColumn<String, LONGTEXT_T>>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.LONGTEXT_T).add(block)
 
   /* Versions without configuration closure */
   inline fun BIT(name:String) = ColumnConfiguration(this, name, ColumnType.BIT_T).add({})
