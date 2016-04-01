@@ -81,14 +81,14 @@ abstract class MutableTable constructor(override val _name: String,
 
   abstract fun init()
 
-  inline fun <T :Any, S: ColumnType<T,S>, C :ColumnConfiguration<T, S>, COL_T:Column<T, S>>
-        C.add(block: C.() ->Unit): Table.FieldAccessor<T,S, COL_T> {
+  inline fun <T :Any, S: ColumnType<T,S>, CONF_T :ColumnConfiguration<T, S, C>, C :Column<T, S>>
+        CONF_T.add(block: CONF_T.() ->Unit): Table.FieldAccessor<T,S, C> {
     // Use the name delegator to prevent access issues.
-    return ColumnImpl(apply(block)).apply { (_cols as MutableList<Column<*,*>>).add(this)}.let{ name(name, it.type)}
+    return (ColumnImpl(apply(block)) as C).apply { (_cols as MutableList<Column<*,*>>).add(this)}.let{ name(name, it.type)}
   }
 
-  protected inline fun BIT(name:String, block: ColumnConfiguration<Boolean, ColumnType.BIT_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BIT_T).add(block)
-  protected inline fun BIT(name:String, length:Int, block: ColumnConfiguration<Array<Boolean>, ColumnType.BITFIELD_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BITFIELD_T).add(block)
+  protected inline fun BIT(name:String, block: ColumnConfiguration<Boolean, ColumnType.BIT_T, Column<Boolean, ColumnType.BIT_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BIT_T).add(block)
+  protected inline fun BIT(name:String, length:Int, block: LengthColumnConfiguration<Array<Boolean>, ColumnType.BITFIELD_T, LengthColumn<Array<Boolean>, ColumnType.BITFIELD_T>>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.BITFIELD_T, length).add(block)
   protected inline fun TINYINT(name:String, block: NumberColumnConfiguration<Byte, ColumnType.TINYINT_T, NumericColumn<Byte, ColumnType.TINYINT_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.TINYINT_T).add(block)
   protected inline fun SMALLINT(name:String, block: NumberColumnConfiguration<Short, ColumnType.SMALLINT_T, NumericColumn<Short, ColumnType.SMALLINT_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.SMALLINT_T).add(block)
   protected inline fun MEDIUMINT(name:String, block: NumberColumnConfiguration<Int, ColumnType.MEDIUMINT_T, NumericColumn<Int, ColumnType.MEDIUMINT_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.MEDIUMINT_T).add(block)
@@ -98,19 +98,19 @@ abstract class MutableTable constructor(override val _name: String,
   protected inline fun DOUBLE(name:String, block: NumberColumnConfiguration<Double, ColumnType.DOUBLE_T, NumericColumn<Double, ColumnType.DOUBLE_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.DOUBLE_T).add(block)
   protected inline fun DECIMAL(name:String, precision:Int=-1, scale:Int=-1, block: DecimalColumnConfiguration<BigDecimal, ColumnType.DECIMAL_T>.() -> Unit) = DecimalColumnConfiguration(this, name, ColumnType.DECIMAL_T, precision, scale).add(block)
   protected inline fun NUMERIC(name:String, precision:Int=-1, scale:Int=-1, block: DecimalColumnConfiguration<BigDecimal, ColumnType.NUMERIC_T>.() -> Unit) = DecimalColumnConfiguration(this, name, ColumnType.NUMERIC_T, precision, scale).add(block)
-  protected inline fun DATE(name:String, block: ColumnConfiguration<java.sql.Date, ColumnType.DATE_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATE_T).add(block)
-  protected inline fun TIME(name:String, block: ColumnConfiguration<java.sql.Time, ColumnType.TIME_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TIME_T).add(block)
-  protected inline fun TIMESTAMP(name:String, block: ColumnConfiguration<java.sql.Timestamp, ColumnType.TIMESTAMP_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TIMESTAMP_T).add(block)
-  protected inline fun DATETIME(name:String, block: ColumnConfiguration<java.sql.Timestamp, ColumnType.DATETIME_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATETIME_T).add(block)
-  protected inline fun YEAR(name:String, block: ColumnConfiguration<java.sql.Date, ColumnType.YEAR_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.YEAR_T).add(block)
+  protected inline fun DATE(name:String, block: ColumnConfiguration<java.sql.Date, ColumnType.DATE_T, Column<java.sql.Date, ColumnType.DATE_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATE_T).add(block)
+  protected inline fun TIME(name:String, block: ColumnConfiguration<java.sql.Time, ColumnType.TIME_T, Column<java.sql.Time, ColumnType.TIME_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TIME_T).add(block)
+  protected inline fun TIMESTAMP(name:String, block: ColumnConfiguration<java.sql.Timestamp, ColumnType.TIMESTAMP_T, Column<java.sql.Timestamp, ColumnType.TIMESTAMP_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TIMESTAMP_T).add(block)
+  protected inline fun DATETIME(name:String, block: ColumnConfiguration<java.sql.Timestamp, ColumnType.DATETIME_T, Column<java.sql.Timestamp, ColumnType.DATETIME_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATETIME_T).add(block)
+  protected inline fun YEAR(name:String, block: ColumnConfiguration<java.sql.Date, ColumnType.YEAR_T, Column<java.sql.Date, ColumnType.YEAR_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.YEAR_T).add(block)
   protected inline fun CHAR(name:String, length:Int = -1, block: LengthCharColumnConfiguration<String, ColumnType.CHAR_T>.() -> Unit) = LengthCharColumnConfiguration(this, name, ColumnType.CHAR_T, length).add(block)
   protected inline fun VARCHAR(name:String, length:Int, block: LengthCharColumnConfiguration<String, ColumnType.VARCHAR_T>.() -> Unit) = LengthCharColumnConfiguration(this, name, ColumnType.VARCHAR_T, length).add(block)
   protected inline fun BINARY(name:String, length:Int, block: LengthColumnConfiguration<ByteArray, ColumnType.BINARY_T, LengthColumn<ByteArray, ColumnType.BINARY_T>>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.BINARY_T, length).add(block)
   protected inline fun VARBINARY(name:String, length:Int, block: LengthColumnConfiguration<ByteArray, ColumnType.VARBINARY_T, LengthColumn<ByteArray, ColumnType.VARBINARY_T>>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.VARBINARY_T, length).add(block)
-  protected inline fun TINYBLOB(name:String, block: ColumnConfiguration<ByteArray, ColumnType.TINYBLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TINYBLOB_T).add(block)
-  protected inline fun BLOB(name:String, block: ColumnConfiguration<ByteArray, ColumnType.BLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BLOB_T).add(block)
-  protected inline fun MEDIUMBLOB(name:String, block: ColumnConfiguration<ByteArray, ColumnType.MEDIUMBLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.MEDIUMBLOB_T).add(block)
-  protected inline fun LONGBLOB(name:String, block: ColumnConfiguration<ByteArray, ColumnType.LONGBLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.LONGBLOB_T).add(block)
+  protected inline fun TINYBLOB(name:String, block: ColumnConfiguration<ByteArray, ColumnType.TINYBLOB_T, Column<ByteArray, ColumnType.TINYBLOB_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TINYBLOB_T).add(block)
+  protected inline fun BLOB(name:String, block: ColumnConfiguration<ByteArray, ColumnType.BLOB_T, Column<ByteArray, ColumnType.BLOB_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BLOB_T).add(block)
+  protected inline fun MEDIUMBLOB(name:String, block: ColumnConfiguration<ByteArray, ColumnType.MEDIUMBLOB_T, Column<ByteArray, ColumnType.MEDIUMBLOB_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.MEDIUMBLOB_T).add(block)
+  protected inline fun LONGBLOB(name:String, block: ColumnConfiguration<ByteArray, ColumnType.LONGBLOB_T, Column<ByteArray, ColumnType.LONGBLOB_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.LONGBLOB_T).add(block)
   protected inline fun TINYTEXT(name:String, block: CharColumnConfiguration<String, ColumnType.TINYTEXT_T, CharColumn<String, ColumnType.TINYTEXT_T>>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.TINYTEXT_T).add(block)
   protected inline fun TEXT(name:String, block: CharColumnConfiguration<String, ColumnType.TEXT_T, CharColumn<String, ColumnType.TEXT_T>>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.TEXT_T).add(block)
   protected inline fun MEDIUMTEXT(name:String, block: CharColumnConfiguration<String, ColumnType.MEDIUMTEXT_T, CharColumn<String, ColumnType.MEDIUMTEXT_T>>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.MEDIUMTEXT_T).add(block)

@@ -176,7 +176,7 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S>>(val typeName:String, type: K
 
 }
 
-open class ColumnConfiguration<T:Any, S: ColumnType<T,S>>(val table: TableRef, val name: String, val type: S) {
+open class ColumnConfiguration<T:Any, S: ColumnType<T,S>,C:Column<T,S>>(val table: TableRef, val name: String, val type: S) {
 
   enum class ColumnFormat { FIXED, MEMORY, DEFAULT }
   enum class StorageFormat { DISK, MEMORY, DEFAULT }
@@ -203,7 +203,7 @@ open class ColumnConfiguration<T:Any, S: ColumnType<T,S>>(val table: TableRef, v
 
 }
 
-open class NumberColumnConfiguration<T:Any, S: ColumnType<T,S>, C:NumericColumn<T,S>>(table: TableRef, name: String, type: S): ColumnConfiguration<T, S>(table, name, type) {
+open class NumberColumnConfiguration<T:Any, S: ColumnType<T,S>, C:NumericColumn<T,S>>(table: TableRef, name: String, type: S): ColumnConfiguration<T, S, C>(table, name, type) {
   var unsigned: Boolean = false
   var zerofill: Boolean = false
   var displayLength: Int = -1
@@ -228,7 +228,7 @@ interface CharColumn<T:Any, S: ColumnType<T, S>>: Column<T, S> {
 }
 
 
-open class CharColumnConfiguration<T:Any, S: ColumnType<T,S>, C:CharColumn<T,S>>(table: TableRef, name: String, type: S): ColumnConfiguration<T, S>(table, name, type) {
+open class CharColumnConfiguration<T:Any, S: ColumnType<T,S>, C:CharColumn<T,S>>(table: TableRef, name: String, type: S): ColumnConfiguration<T, S, C>(table, name, type) {
   var charset: String? = null
   var collation: String? = null
   var binary:Boolean = false
@@ -265,7 +265,7 @@ interface LengthColumnConfiguration<T:Any, S: ColumnType<T,S>, C:LengthColumn<T,
   val length:Int
 }
 
-final class SimpleLengthColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, override val length: Int): ColumnConfiguration<T, S>(table, name, type), LengthColumnConfiguration<T, S, LengthColumn<T,S>>
+final class SimpleLengthColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, override val length: Int): ColumnConfiguration<T, S, LengthColumn<T,S>>(table, name, type), LengthColumnConfiguration<T, S, LengthColumn<T,S>>
 
 class ForeignKey constructor(private val fromCols:List<ColumnRef<*,*>>, private val toTable:TableRef, private val toCols:List<ColumnRef<*,*>>) {
   internal fun toDDL(): CharSequence {
@@ -288,11 +288,14 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
   val uniqueKeys = mutableListOf<List<ColumnRef<*,*>>>()
   val indices = mutableListOf<List<ColumnRef<*,*>>>()
 
-  inline fun <V:Any, S: ColumnType<V,S>,T:ColumnConfiguration<V, S>> T.add(block: T.() ->Unit) = ColumnImpl(apply(block)).apply { cols.add(this)}. ref()
+  inline fun <T :Any, S: ColumnType<T,S>, C:Column<T,S>, CONF_T :ColumnConfiguration<T, S, C>> CONF_T.add(block: CONF_T.() ->Unit):ColumnRef<T,S> {
+    // The casting to C is necessary to make stuff compile
+    return (ColumnImpl(this.apply(block)) as C).let { it -> cols.add(it); it.ref() }
+  }
 
   /* Versions with configuration closure. */
-  inline fun BIT(name:String, block: ColumnConfiguration<Boolean, BIT_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BIT_T).add(block)
-  inline fun BIT(name:String, length:Int, block: ColumnConfiguration<Array<Boolean>, BITFIELD_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BITFIELD_T).add(block)
+  inline fun BIT(name:String, block: ColumnConfiguration<Boolean, BIT_T, Column<Boolean, BIT_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BIT_T).add(block)
+  inline fun BIT(name:String, length:Int, block: LengthColumnConfiguration<Array<Boolean>, BITFIELD_T, LengthColumn<Array<Boolean>,BITFIELD_T>>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.BITFIELD_T, length).add(block)
   inline fun TINYINT(name:String, block: NumberColumnConfiguration<Byte, TINYINT_T, NumericColumn<Byte, TINYINT_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.TINYINT_T).add(block)
   inline fun SMALLINT(name:String, block: NumberColumnConfiguration<Short, SMALLINT_T, NumericColumn<Short, SMALLINT_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.SMALLINT_T).add(block)
   inline fun MEDIUMINT(name:String, block: NumberColumnConfiguration<Int, MEDIUMINT_T, NumericColumn<Int, MEDIUMINT_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.MEDIUMINT_T).add(block)
@@ -302,19 +305,19 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
   inline fun DOUBLE(name:String, block: NumberColumnConfiguration<Double, DOUBLE_T, NumericColumn<Double, DOUBLE_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.DOUBLE_T).add(block)
   inline fun DECIMAL(name:String, precision:Int=-1, scale:Int=-1, block: DecimalColumnConfiguration<BigDecimal, DECIMAL_T>.() -> Unit) = DecimalColumnConfiguration(this, name, ColumnType.DECIMAL_T, precision, scale).add(block)
   inline fun NUMERIC(name:String, precision:Int=-1, scale:Int=-1, block: DecimalColumnConfiguration<BigDecimal, NUMERIC_T>.() -> Unit) = DecimalColumnConfiguration(this, name, ColumnType.NUMERIC_T, precision, scale).add(block)
-  inline fun DATE(name:String, block: ColumnConfiguration<java.sql.Date, DATE_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATE_T).add(block)
-  inline fun TIME(name:String, block: ColumnConfiguration<java.sql.Time, TIME_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TIME_T).add(block)
-  inline fun TIMESTAMP(name:String, block: ColumnConfiguration<java.sql.Timestamp, TIMESTAMP_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TIMESTAMP_T).add(block)
-  inline fun DATETIME(name:String, block: ColumnConfiguration<java.sql.Timestamp, DATETIME_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATETIME_T).add(block)
-  inline fun YEAR(name:String, block: ColumnConfiguration<java.sql.Date, YEAR_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.YEAR_T).add(block)
+  inline fun DATE(name:String, block: ColumnConfiguration<java.sql.Date, DATE_T, Column<java.sql.Date, DATE_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATE_T).add(block)
+  inline fun TIME(name:String, block: ColumnConfiguration<java.sql.Time, TIME_T, Column<java.sql.Time, TIME_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TIME_T).add(block)
+  inline fun TIMESTAMP(name:String, block: ColumnConfiguration<java.sql.Timestamp, TIMESTAMP_T, Column<java.sql.Timestamp, TIMESTAMP_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TIMESTAMP_T).add(block)
+  inline fun DATETIME(name:String, block: ColumnConfiguration<java.sql.Timestamp, DATETIME_T, Column<java.sql.Timestamp, DATETIME_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATETIME_T).add(block)
+  inline fun YEAR(name:String, block: ColumnConfiguration<java.sql.Date, YEAR_T, Column<java.sql.Date, YEAR_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.YEAR_T).add(block)
   inline fun CHAR(name:String, length:Int = -1, block: LengthCharColumnConfiguration<String, CHAR_T>.() -> Unit) = LengthCharColumnConfiguration(this, name, ColumnType.CHAR_T, length).add(block)
   inline fun VARCHAR(name:String, length:Int, block: LengthCharColumnConfiguration<String, VARCHAR_T>.() -> Unit) = LengthCharColumnConfiguration(this, name, ColumnType.VARCHAR_T, length).add(block)
   inline fun BINARY(name:String, length:Int, block: LengthColumnConfiguration<ByteArray, BINARY_T, LengthColumn<ByteArray, BINARY_T>>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.BINARY_T, length).add(block)
   inline fun VARBINARY(name:String, length:Int, block: LengthColumnConfiguration<ByteArray, VARBINARY_T, LengthColumn<ByteArray, VARBINARY_T>>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.VARBINARY_T, length).add(block)
-  inline fun TINYBLOB(name:String, block: ColumnConfiguration<ByteArray, TINYBLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TINYBLOB_T).add(block)
-  inline fun BLOB(name:String, block: ColumnConfiguration<ByteArray, BLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BLOB_T).add(block)
-  inline fun MEDIUMBLOB(name:String, block: ColumnConfiguration<ByteArray, MEDIUMBLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.MEDIUMBLOB_T).add(block)
-  inline fun LONGBLOB(name:String, block: ColumnConfiguration<ByteArray, LONGBLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.LONGBLOB_T).add(block)
+  inline fun TINYBLOB(name:String, block: ColumnConfiguration<ByteArray, TINYBLOB_T, Column<ByteArray, TINYBLOB_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TINYBLOB_T).add(block)
+  inline fun BLOB(name:String, block: ColumnConfiguration<ByteArray, BLOB_T, Column<ByteArray, BLOB_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BLOB_T).add(block)
+  inline fun MEDIUMBLOB(name:String, block: ColumnConfiguration<ByteArray, MEDIUMBLOB_T, Column<ByteArray, MEDIUMBLOB_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.MEDIUMBLOB_T).add(block)
+  inline fun LONGBLOB(name:String, block: ColumnConfiguration<ByteArray, LONGBLOB_T, Column<ByteArray, LONGBLOB_T>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.LONGBLOB_T).add(block)
   inline fun TINYTEXT(name:String, block: CharColumnConfiguration<String, TINYTEXT_T, CharColumn<String, TINYTEXT_T>>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.TINYTEXT_T).add(block)
   inline fun TEXT(name:String, block: CharColumnConfiguration<String, TEXT_T, CharColumn<String, TEXT_T>>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.TEXT_T).add(block)
   inline fun MEDIUMTEXT(name:String, block: CharColumnConfiguration<String, MEDIUMTEXT_T, CharColumn<String, MEDIUMTEXT_T>>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.MEDIUMTEXT_T).add(block)
@@ -349,7 +352,7 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
   inline fun TEXT(name:String) = CharColumnConfiguration(this, name, ColumnType.TEXT_T).add({})
   inline fun MEDIUMTEXT(name:String) = CharColumnConfiguration(this, name, ColumnType.MEDIUMTEXT_T).add({})
   inline fun LONGTEXT(name:String) = CharColumnConfiguration(this, name, ColumnType.LONGTEXT_T).add({})
-  
+
   inline fun INDEX(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { indices.add(mutableListOf(col1).apply { addAll(cols) })}
   inline fun UNIQUE(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { uniqueKeys.add(mutableListOf(col1).apply { addAll(cols) })}
   inline fun PRIMARY_KEY(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { primaryKey = mutableListOf(col1).apply { addAll(cols) }}
@@ -450,7 +453,7 @@ interface Table:TableRef {
   fun resolve(ref: ColumnRef<*, *>): Column<*, *>
 
   interface FieldAccessor<T:Any, S:ColumnType<T,S>, C:Column<T,S>> {
-    operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): Column<T, S>
+    operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): C
   }
 
   fun appendDDL(appendable: Appendable)
