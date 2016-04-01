@@ -21,16 +21,17 @@
 package uk.ac.bournemouth.kotlinsql
 
 import kotlin.reflect.KProperty
+import uk.ac.bournemouth.kotlinsql.ColumnType.*
 
 
 internal val LINE_SEPARATOR: String by lazy { System.getProperty("line.separator")!! }
 
-internal interface AllColumns<T:Any, S:ColumnType<T,S>>: DecimalColumn<T,S>
+internal interface AllColumns<T:Any, S: BaseColumnType<T,S>>: DecimalColumn<T,S>
 /**
  * Implementation for the database API
  */
 
-open class ColumnImpl<T:Any, S: ColumnType<T, S>, out C:Column<T,S>> private constructor (
+open class ColumnImpl<T:Any, S: BaseColumnType<T, S>, out C:Column<T,S>> private constructor (
       override val table: TableRef,
       override val type: S,
       override val name: String,
@@ -48,7 +49,7 @@ open class ColumnImpl<T:Any, S: ColumnType<T, S>, out C:Column<T,S>> private con
       override val precision: Int = -1,
       override val scale:Int = -1
 ) : AllColumns<T, S> {
-  constructor(configuration: ColumnConfiguration<T, S>):
+  constructor(configuration: ColumnConfiguration<T, S, *>):
       this(table=configuration.table,
            type=configuration.type,
            name=configuration.name,
@@ -132,11 +133,11 @@ abstract class AbstractTable: Table {
 
   override fun field(name:String) = _cols.firstOrNull {it.name==name}
 
-  operator fun <T:Any, S: ColumnType<T, S>> getValue(thisRef: ImmutableTable, property: KProperty<*>): Column<T, S> {
+  operator fun <T:Any, S: BaseColumnType<T, S>> getValue(thisRef: ImmutableTable, property: KProperty<*>): Column<T, S> {
     return field(property.name) as Column<T, S>
   }
 
-  open protected class TypeFieldAccessor<T:Any, S: ColumnType<T, S>, C:Column<T,S>>(val type: ColumnType<T, S>): Table.FieldAccessor<T, S, C> {
+  open protected class TypeFieldAccessor<T:Any, S: BaseColumnType<T, S>, C:Column<T,S>>(val type: BaseColumnType<T, S>): Table.FieldAccessor<T, S, C> {
     private var value: C? = null
     open fun name(property: kotlin.reflect.KProperty<*>) = property.name
     override operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): C {
@@ -149,11 +150,11 @@ abstract class AbstractTable: Table {
   }
 
   /** Property delegator to access database columns by name and type. */
-  protected fun <T:Any, S: ColumnType<T, S>, C: Column<T,S>> name(name:String, type: ColumnType<T, S>) = NamedFieldAccessor<T,S,C>(
+  protected fun <T:Any, S: BaseColumnType<T, S>, C: Column<T,S>> name(name:String, type: BaseColumnType<T, S>) = NamedFieldAccessor<T,S,C>(
         name,
         type)
 
-  final protected class NamedFieldAccessor<T:Any, S: ColumnType<T, S>, C:Column<T,S>>(val name:String, type: ColumnType<T, S>): TypeFieldAccessor<T, S, C>(type) {
+  final protected class NamedFieldAccessor<T:Any, S: BaseColumnType<T, S>, C:Column<T,S>>(val name:String, type: BaseColumnType<T, S>): TypeFieldAccessor<T, S, C>(type) {
     override fun name(property: kotlin.reflect.KProperty<*>): String = this.name
   }
 
