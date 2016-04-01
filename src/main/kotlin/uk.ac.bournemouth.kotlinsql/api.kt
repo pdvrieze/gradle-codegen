@@ -20,6 +20,7 @@
 
 package uk.ac.bournemouth.kotlinsql
 
+import uk.ac.bournemouth.kotlinsql.ColumnType.*
 import java.math.BigDecimal
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty
@@ -85,18 +86,18 @@ interface TableRef {
  * @param name The name of the column
  * @param type The [ColumnType] of the column.
  */
-interface ColumnRef<T:Any> {
+interface ColumnRef<T:Any, S: ColumnType<T, S>> {
   val table: TableRef
   val name:String
-  val type: ColumnType<T>
+  val type: S
 }
 
-class ColsetRef(val table:TableRef, val columns:List<out ColumnRef<*>>) {
-  constructor(table:TableRef, col1: ColumnRef<*>, vararg cols:ColumnRef<*>): this(table, mutableListOf(col1).apply { addAll(cols) })
+class ColsetRef(val table:TableRef, val columns:List<out ColumnRef<*, *>>) {
+  constructor(table:TableRef, col1: ColumnRef<*, *>, vararg cols:ColumnRef<*, *>): this(table, mutableListOf(col1).apply { addAll(cols) })
 }
 
-interface Column<T:Any>: ColumnRef<T> {
-  fun ref(): ColumnRef<T>
+interface Column<T:Any, S: ColumnType<T, S>>: ColumnRef<T,S> {
+  fun ref(): ColumnRef<T,S>
   val notnull: Boolean?
   val unique: Boolean
   val autoincrement: Boolean
@@ -111,51 +112,51 @@ interface BoundedType {
   val maxLen:Int
 }
 
-sealed class ColumnType<T:Any>(val typeName:String, type: KClass<T>) {
+sealed class ColumnType<T:Any, S: ColumnType<T, S>>(val typeName:String, type: KClass<T>) {
 
   @Suppress("UNCHECKED")
-  fun cast(column: Column<*>): Column<T> {
+  fun cast(column: Column<*,*>): Column<T, S> {
     if (column.type.typeName == typeName) {
-      return column as Column<T>
+      return column as Column<T, S>
     } else {
       throw TypeCastException("The given column is not of the correct type")
     }
   }
 
-  object BIT_T       : ColumnType<Boolean>("BIT", Boolean::class), BoundedType { override val maxLen = 64 }
-  object BITFIELD_T  : ColumnType<Array<Boolean>>("BIT", Array<Boolean>::class)
-  object TINYINT_T   : ColumnType<Byte>("BIGINT", Byte::class)
-  object SMALLINT_T  : ColumnType<Short>("SMALLINT", Short::class)
-  object MEDIUMINT_T : ColumnType<Int>("MEDIUMINT", Int::class)
-  object INT_T       : ColumnType<Int>("INT", Int::class)
-  object BIGINT_T    : ColumnType<Long>("BIGINT", Long::class)
+  object BIT_T       : ColumnType<Boolean, BIT_T>("BIT", Boolean::class), BoundedType { override val maxLen = 64 }
+  object BITFIELD_T  : ColumnType<Array<Boolean>, BITFIELD_T>("BIT", Array<Boolean>::class)
+  object TINYINT_T   : ColumnType<Byte, TINYINT_T>("BIGINT", Byte::class)
+  object SMALLINT_T  : ColumnType<Short, SMALLINT_T>("SMALLINT", Short::class)
+  object MEDIUMINT_T : ColumnType<Int, MEDIUMINT_T>("MEDIUMINT", Int::class)
+  object INT_T       : ColumnType<Int, INT_T>("INT", Int::class)
+  object BIGINT_T    : ColumnType<Long, BIGINT_T>("BIGINT", Long::class)
 
-  object FLOAT_T     : ColumnType<Float>("FLOAT", Float::class)
-  object DOUBLE_T    : ColumnType<Double>("DOUBLE", Double::class)
+  object FLOAT_T     : ColumnType<Float, FLOAT_T>("FLOAT", Float::class)
+  object DOUBLE_T    : ColumnType<Double, DOUBLE_T>("DOUBLE", Double::class)
 
-  object DECIMAL_T   : ColumnType<BigDecimal>("DECIMAL", BigDecimal::class)
-  object NUMERIC_T   : ColumnType<BigDecimal>("NUMERIC", BigDecimal::class)
+  object DECIMAL_T   : ColumnType<BigDecimal, DECIMAL_T>("DECIMAL", BigDecimal::class)
+  object NUMERIC_T   : ColumnType<BigDecimal, NUMERIC_T>("NUMERIC", BigDecimal::class)
 
-  object DATE_T      : ColumnType<java.sql.Date>("DATE", java.sql.Date::class)
-  object TIME_T      : ColumnType<java.sql.Time>("TIME", java.sql.Time::class)
-  object TIMESTAMP_T : ColumnType<java.sql.Timestamp>("TIMESTAMP", java.sql.Timestamp::class)
-  object DATETIME_T  : ColumnType<java.sql.Timestamp>("TIMESTAMP", java.sql.Timestamp::class)
-  object YEAR_T      : ColumnType<java.sql.Date>("YEAR", java.sql.Date::class)
+  object DATE_T      : ColumnType<java.sql.Date, DATE_T>("DATE", java.sql.Date::class)
+  object TIME_T      : ColumnType<java.sql.Time, TIME_T>("TIME", java.sql.Time::class)
+  object TIMESTAMP_T : ColumnType<java.sql.Timestamp, TIMESTAMP_T>("TIMESTAMP", java.sql.Timestamp::class)
+  object DATETIME_T  : ColumnType<java.sql.Timestamp, DATETIME_T>("TIMESTAMP", java.sql.Timestamp::class)
+  object YEAR_T      : ColumnType<java.sql.Date, YEAR_T>("YEAR", java.sql.Date::class)
 
-  object CHAR_T      : ColumnType<String>("CHAR", String::class), BoundedType { override val maxLen = 255 }
-  object VARCHAR_T   : ColumnType<String>("VARCHAR", String::class), BoundedType { override val maxLen = 0xffff }
+  object CHAR_T      : ColumnType<String, CHAR_T>("CHAR", String::class), BoundedType { override val maxLen = 255 }
+  object VARCHAR_T   : ColumnType<String, VARCHAR_T>("VARCHAR", String::class), BoundedType { override val maxLen = 0xffff }
 
-  object BINARY_T    : ColumnType<ByteArray>("BINARY", ByteArray::class), BoundedType { override val maxLen = 255 }
-  object VARBINARY_T : ColumnType<ByteArray>("VARBINARY", ByteArray::class), BoundedType { override val maxLen = 0xffff }
-  object TINYBLOB_T  : ColumnType<ByteArray>("TINYBLOB", ByteArray::class), BoundedType { override val maxLen = 255 }
-  object BLOB_T      : ColumnType<ByteArray>("BLOB", ByteArray::class), BoundedType { override val maxLen = 0xffff }
-  object MEDIUMBLOB_T: ColumnType<ByteArray>("MEDIUMBLOB", ByteArray::class), BoundedType { override val maxLen = 0xffffff }
-  object LONGBLOB_T  : ColumnType<ByteArray>("LONGBLOB", ByteArray::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
+  object BINARY_T    : ColumnType<ByteArray, BINARY_T>("BINARY", ByteArray::class), BoundedType { override val maxLen = 255 }
+  object VARBINARY_T : ColumnType<ByteArray, VARBINARY_T>("VARBINARY", ByteArray::class), BoundedType { override val maxLen = 0xffff }
+  object TINYBLOB_T  : ColumnType<ByteArray, TINYBLOB_T>("TINYBLOB", ByteArray::class), BoundedType { override val maxLen = 255 }
+  object BLOB_T      : ColumnType<ByteArray, BLOB_T>("BLOB", ByteArray::class), BoundedType { override val maxLen = 0xffff }
+  object MEDIUMBLOB_T: ColumnType<ByteArray, MEDIUMBLOB_T>("MEDIUMBLOB", ByteArray::class), BoundedType { override val maxLen = 0xffffff }
+  object LONGBLOB_T  : ColumnType<ByteArray, LONGBLOB_T>("LONGBLOB", ByteArray::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
 
-  object TINYTEXT_T  : ColumnType<String>("TINYTEXT", String::class), BoundedType { override val maxLen = 255 }
-  object TEXT_T      : ColumnType<String>("TEXT", String::class), BoundedType { override val maxLen = 0xffff }
-  object MEDIUMTEXT_T: ColumnType<String>("MEDIUMTEXT", String::class), BoundedType { override val maxLen = 0xffffff }
-  object LONGTEXT_T  : ColumnType<String>("LONGTEXT", String::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
+  object TINYTEXT_T  : ColumnType<String, TINYTEXT_T>("TINYTEXT", String::class), BoundedType { override val maxLen = 255 }
+  object TEXT_T      : ColumnType<String, TEXT_T>("TEXT", String::class), BoundedType { override val maxLen = 0xffff }
+  object MEDIUMTEXT_T: ColumnType<String, MEDIUMTEXT_T>("MEDIUMTEXT", String::class), BoundedType { override val maxLen = 0xffffff }
+  object LONGTEXT_T  : ColumnType<String, LONGTEXT_T>("LONGTEXT", String::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
 
   /*
   ENUM(value1,value2,value3,...) [CHARACTER SET charset_name] [COLLATE collation_name]
@@ -164,7 +165,7 @@ sealed class ColumnType<T:Any>(val typeName:String, type: KClass<T>) {
 
 }
 
-open class ColumnConfiguration<T:Any>(val table: TableRef, val name: String, val type: ColumnType<T>) {
+open class ColumnConfiguration<T:Any, S: ColumnType<T,S>>(val table: TableRef, val name: String, val type: S) {
 
   enum class ColumnFormat { FIXED, MEMORY, DEFAULT }
   enum class StorageFormat { DISK, MEMORY, DEFAULT }
@@ -187,11 +188,11 @@ open class ColumnConfiguration<T:Any>(val table: TableRef, val name: String, val
   inline fun COMMENT(comment:String) { this.comment = comment }
   inline fun COLUMN_FORMAT(format:ColumnFormat) { columnFormat = format }
   inline fun STORAGE(format:StorageFormat) { storageFormat = format }
-  inline fun REFERENCES(table:TableRef, col1:ColumnRef<*>, vararg columns: ColumnRef<*>) { references=ColsetRef(table, col1, *columns) }
+  inline fun REFERENCES(table:TableRef, col1:ColumnRef<*,*>, vararg columns: ColumnRef<*,*>) { references=ColsetRef(table, col1, *columns) }
 
 }
 
-open class NumberColumnConfiguration<T:Any>(table: TableRef, name: String, type: ColumnType<T>): ColumnConfiguration<T>(table, name, type) {
+open class NumberColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S): ColumnConfiguration<T, S>(table, name, type) {
   var unsigned: Boolean = false
   var zerofill: Boolean = false
   var displayLength: Int = -1
@@ -202,7 +203,7 @@ open class NumberColumnConfiguration<T:Any>(table: TableRef, name: String, type:
 
 }
 
-open class CharColumnConfiguration<T:Any>(table: TableRef, name: String, type: ColumnType<T>): ColumnConfiguration<T>(table, name, type) {
+open class CharColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S): ColumnConfiguration<T, S>(table, name, type) {
   var charset: String? = null
   var collation: String? = null
   var binary:Boolean = false
@@ -213,61 +214,61 @@ open class CharColumnConfiguration<T:Any>(table: TableRef, name: String, type: C
   inline fun COLLATE(collation:String) { this.collation = collation }
 }
 
-final class LengthCharColumnConfiguration<T:Any>(table: TableRef, name: String, type: ColumnType<T>, override val length: Int): CharColumnConfiguration<T>(table, name, type), LengthColumnConfiguration<T>
+final class LengthCharColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, override val length: Int): CharColumnConfiguration<T, S>(table, name, type), LengthColumnConfiguration<T, S>
 
-final class DecimalColumnConfiguration<T:Any>(table: TableRef, name: String, type: ColumnType<T>, val precision: Int, val scale: Int): NumberColumnConfiguration<T>(table, name, type) {
+final class DecimalColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, val precision: Int, val scale: Int): NumberColumnConfiguration<T, S>(table, name, type) {
   val defaultPrecision=10
   val defaultScale=0
 }
 
-interface LengthColumnConfiguration<T:Any> {
+interface LengthColumnConfiguration<T:Any, S: ColumnType<T,S>> {
   val length:Int
 }
 
-class SimpleLengthColumnConfiguration<T:Any>(table: TableRef, name: String, type: ColumnType<T>, override val length: Int): ColumnConfiguration<T>(table, name, type), LengthColumnConfiguration<T>
+class SimpleLengthColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, override val length: Int): ColumnConfiguration<T, S>(table, name, type), LengthColumnConfiguration<T, S>
 
-class ForeignKey constructor(private val fromCols:List<ColumnRef<*>>, private val toTable:TableRef, private val toCols:List<ColumnRef<*>>)
+class ForeignKey constructor(private val fromCols:List<ColumnRef<*,*>>, private val toTable:TableRef, private val toCols:List<ColumnRef<*,*>>)
 
 @Suppress("NOTHING_TO_INLINE")
 class TableConfiguration(override val _name:String, val extra:String?=null):TableRef {
 
-  val cols = mutableListOf<Column<*>>()
-  var primaryKey: List<ColumnRef<*>>? = null
+  val cols = mutableListOf<Column<*, *>>()
+  var primaryKey: List<ColumnRef<*,*>>? = null
   val foreignKeys = mutableListOf<ForeignKey>()
-  val uniqueKeys = mutableListOf<List<ColumnRef<*>>>()
-  val indices = mutableListOf<List<ColumnRef<*>>>()
+  val uniqueKeys = mutableListOf<List<ColumnRef<*,*>>>()
+  val indices = mutableListOf<List<ColumnRef<*,*>>>()
 
-  inline fun <V:Any,T:ColumnConfiguration<V>> T.add(block: T.() ->Unit) = ColumnImpl(apply(block)).apply { cols.add(this)}. ref()
+  inline fun <V:Any, S: ColumnType<V,S>,T:ColumnConfiguration<V, S>> T.add(block: T.() ->Unit) = ColumnImpl(apply(block)).apply { cols.add(this)}. ref()
 
   /* Versions with configuration closure. */
-  inline fun BIT(name:String, block: ColumnConfiguration<Boolean>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BIT_T).add(block)
-  inline fun BIT(name:String, length:Int, block: ColumnConfiguration<Array<Boolean>>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BITFIELD_T).add(block)
-  inline fun TINYINT(name:String, block: NumberColumnConfiguration<Byte>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.TINYINT_T).add(block)
-  inline fun SMALLINT(name:String, block: NumberColumnConfiguration<Short>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.SMALLINT_T).add(block)
-  inline fun MEDIUMINT(name:String, block: NumberColumnConfiguration<Int>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.MEDIUMINT_T).add(block)
-  inline fun INT(name:String, block: NumberColumnConfiguration<Int>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.INT_T).add(block)
-  inline fun BIGINT(name:String, block: NumberColumnConfiguration<Long>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.BIGINT_T).add(block)
-  inline fun FLOAT(name:String, block: NumberColumnConfiguration<Float>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.FLOAT_T).add(block)
-  inline fun DOUBLE(name:String, block: NumberColumnConfiguration<Double>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.DOUBLE_T).add(block)
-  inline fun DECIMAL(name:String, precision:Int=-1, scale:Int=-1, block: DecimalColumnConfiguration<BigDecimal>.() -> Unit) = DecimalColumnConfiguration(this, name, ColumnType.DECIMAL_T, precision, scale).add(block)
-  inline fun NUMERIC(name:String, precision:Int=-1, scale:Int=-1, block: DecimalColumnConfiguration<BigDecimal>.() -> Unit) = DecimalColumnConfiguration(this, name, ColumnType.NUMERIC_T, precision, scale).add(block)
-  inline fun DATE(name:String, block: ColumnConfiguration<java.sql.Date>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATE_T).add(block)
-  inline fun TIME(name:String, block: ColumnConfiguration<java.sql.Time>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TIME_T).add(block)
-  inline fun TIMESTAMP(name:String, block: ColumnConfiguration<java.sql.Timestamp>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TIMESTAMP_T).add(block)
-  inline fun DATETIME(name:String, block: ColumnConfiguration<java.sql.Timestamp>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATETIME_T).add(block)
-  inline fun YEAR(name:String, block: ColumnConfiguration<java.sql.Date>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.YEAR_T).add(block)
-  inline fun CHAR(name:String, length:Int = -1, block: LengthCharColumnConfiguration<String>.() -> Unit) = LengthCharColumnConfiguration(this, name, ColumnType.CHAR_T, length).add(block)
-  inline fun VARCHAR(name:String, length:Int, block: LengthCharColumnConfiguration<String>.() -> Unit) = LengthCharColumnConfiguration(this, name, ColumnType.VARCHAR_T, length).add(block)
-  inline fun BINARY(name:String, length:Int, block: LengthColumnConfiguration<ByteArray>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.BINARY_T, length).add(block)
-  inline fun VARBINARY(name:String, length:Int, block: LengthColumnConfiguration<ByteArray>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.VARBINARY_T, length).add(block)
-  inline fun TINYBLOB(name:String, block: ColumnConfiguration<ByteArray>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TINYBLOB_T).add(block)
-  inline fun BLOB(name:String, block: ColumnConfiguration<ByteArray>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BLOB_T).add(block)
-  inline fun MEDIUMBLOB(name:String, block: ColumnConfiguration<ByteArray>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.MEDIUMBLOB_T).add(block)
-  inline fun LONGBLOB(name:String, block: ColumnConfiguration<ByteArray>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.LONGBLOB_T).add(block)
-  inline fun TINYTEXT(name:String, block: CharColumnConfiguration<String>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.TINYTEXT_T).add(block)
-  inline fun TEXT(name:String, block: CharColumnConfiguration<String>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.TEXT_T).add(block)
-  inline fun MEDIUMTEXT(name:String, block: CharColumnConfiguration<String>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.MEDIUMTEXT_T).add(block)
-  inline fun LONGTEXT(name:String, block: CharColumnConfiguration<String>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.LONGTEXT_T).add(block)
+  inline fun BIT(name:String, block: ColumnConfiguration<Boolean, BIT_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BIT_T).add(block)
+  inline fun BIT(name:String, length:Int, block: ColumnConfiguration<Array<Boolean>, BITFIELD_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BITFIELD_T).add(block)
+  inline fun TINYINT(name:String, block: NumberColumnConfiguration<Byte, TINYINT_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.TINYINT_T).add(block)
+  inline fun SMALLINT(name:String, block: NumberColumnConfiguration<Short, SMALLINT_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.SMALLINT_T).add(block)
+  inline fun MEDIUMINT(name:String, block: NumberColumnConfiguration<Int, MEDIUMINT_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.MEDIUMINT_T).add(block)
+  inline fun INT(name:String, block: NumberColumnConfiguration<Int, INT_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.INT_T).add(block)
+  inline fun BIGINT(name:String, block: NumberColumnConfiguration<Long, BIGINT_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.BIGINT_T).add(block)
+  inline fun FLOAT(name:String, block: NumberColumnConfiguration<Float, FLOAT_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.FLOAT_T).add(block)
+  inline fun DOUBLE(name:String, block: NumberColumnConfiguration<Double, DOUBLE_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.DOUBLE_T).add(block)
+  inline fun DECIMAL(name:String, precision:Int=-1, scale:Int=-1, block: DecimalColumnConfiguration<BigDecimal, DECIMAL_T>.() -> Unit) = DecimalColumnConfiguration(this, name, ColumnType.DECIMAL_T, precision, scale).add(block)
+  inline fun NUMERIC(name:String, precision:Int=-1, scale:Int=-1, block: DecimalColumnConfiguration<BigDecimal, NUMERIC_T>.() -> Unit) = DecimalColumnConfiguration(this, name, ColumnType.NUMERIC_T, precision, scale).add(block)
+  inline fun DATE(name:String, block: ColumnConfiguration<java.sql.Date, DATE_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATE_T).add(block)
+  inline fun TIME(name:String, block: ColumnConfiguration<java.sql.Time, TIME_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TIME_T).add(block)
+  inline fun TIMESTAMP(name:String, block: ColumnConfiguration<java.sql.Timestamp, TIMESTAMP_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TIMESTAMP_T).add(block)
+  inline fun DATETIME(name:String, block: ColumnConfiguration<java.sql.Timestamp, DATETIME_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATETIME_T).add(block)
+  inline fun YEAR(name:String, block: ColumnConfiguration<java.sql.Date, YEAR_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.YEAR_T).add(block)
+  inline fun CHAR(name:String, length:Int = -1, block: LengthCharColumnConfiguration<String, CHAR_T>.() -> Unit) = LengthCharColumnConfiguration(this, name, ColumnType.CHAR_T, length).add(block)
+  inline fun VARCHAR(name:String, length:Int, block: LengthCharColumnConfiguration<String, VARCHAR_T>.() -> Unit) = LengthCharColumnConfiguration(this, name, ColumnType.VARCHAR_T, length).add(block)
+  inline fun BINARY(name:String, length:Int, block: LengthColumnConfiguration<ByteArray, BINARY_T>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.BINARY_T, length).add(block)
+  inline fun VARBINARY(name:String, length:Int, block: LengthColumnConfiguration<ByteArray, VARBINARY_T>.() -> Unit) = SimpleLengthColumnConfiguration(this, name, ColumnType.VARBINARY_T, length).add(block)
+  inline fun TINYBLOB(name:String, block: ColumnConfiguration<ByteArray, TINYBLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.TINYBLOB_T).add(block)
+  inline fun BLOB(name:String, block: ColumnConfiguration<ByteArray, BLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BLOB_T).add(block)
+  inline fun MEDIUMBLOB(name:String, block: ColumnConfiguration<ByteArray, MEDIUMBLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.MEDIUMBLOB_T).add(block)
+  inline fun LONGBLOB(name:String, block: ColumnConfiguration<ByteArray, LONGBLOB_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.LONGBLOB_T).add(block)
+  inline fun TINYTEXT(name:String, block: CharColumnConfiguration<String, TINYTEXT_T>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.TINYTEXT_T).add(block)
+  inline fun TEXT(name:String, block: CharColumnConfiguration<String, TEXT_T>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.TEXT_T).add(block)
+  inline fun MEDIUMTEXT(name:String, block: CharColumnConfiguration<String, MEDIUMTEXT_T>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.MEDIUMTEXT_T).add(block)
+  inline fun LONGTEXT(name:String, block: CharColumnConfiguration<String, LONGTEXT_T>.() -> Unit) = CharColumnConfiguration(this, name, ColumnType.LONGTEXT_T).add(block)
 
   /* Versions without configuration closure */
   inline fun BIT(name:String) = ColumnConfiguration(this, name, ColumnType.BIT_T).add({})
@@ -299,63 +300,63 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
   inline fun MEDIUMTEXT(name:String) = CharColumnConfiguration(this, name, ColumnType.MEDIUMTEXT_T).add({})
   inline fun LONGTEXT(name:String) = CharColumnConfiguration(this, name, ColumnType.LONGTEXT_T).add({})
   
-  inline fun INDEX(col1: ColumnRef<*>, vararg cols: ColumnRef<*>) { indices.add(mutableListOf(col1).apply { addAll(cols) })}
-  inline fun UNIQUE(col1: ColumnRef<*>, vararg cols: ColumnRef<*>) { uniqueKeys.add(mutableListOf(col1).apply { addAll(cols) })}
-  inline fun PRIMARY_KEY(col1: ColumnRef<*>, vararg cols: ColumnRef<*>) { primaryKey = mutableListOf(col1).apply { addAll(cols) }}
+  inline fun INDEX(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { indices.add(mutableListOf(col1).apply { addAll(cols) })}
+  inline fun UNIQUE(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { uniqueKeys.add(mutableListOf(col1).apply { addAll(cols) })}
+  inline fun PRIMARY_KEY(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { primaryKey = mutableListOf(col1).apply { addAll(cols) }}
 
-  class __FOREIGN_KEY__6<T1:Any, T2:Any, T3:Any, T4:Any, T5:Any, T6:Any>(val configuration:TableConfiguration, val col1:ColumnRef<T1>, val col2:ColumnRef<T2>, val col3:ColumnRef<T3>, val col4:ColumnRef<T4>, val col5:ColumnRef<T5>, val col6:ColumnRef<T6>) {
-    inline fun REFERENCES(ref1:ColumnRef<T1>, ref2:ColumnRef<T2>, ref3:ColumnRef<T3>, ref4:ColumnRef<T4>, ref5:ColumnRef<T5>, ref6:ColumnRef<T6>) {
+  class __FOREIGN_KEY__6<T1:Any, S1:ColumnType<T1,S1>, T2:Any, S2:ColumnType<T2,S2>, T3:Any, S3:ColumnType<T3,S3>, T4:Any, S4:ColumnType<T4,S4>, T5:Any, S5:ColumnType<T5,S5>, T6:Any, S6:ColumnType<T6,S6>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>, val col3:ColumnRef<T3, S3>, val col4:ColumnRef<T4, S4>, val col5:ColumnRef<T5, S5>, val col6:ColumnRef<T6, S6>) {
+    inline fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>, ref3:ColumnRef<T3, S3>, ref4:ColumnRef<T4, S4>, ref5:ColumnRef<T5, S5>, ref6:ColumnRef<T6, S6>) {
       configuration.foreignKeys.add(ForeignKey(listOf(col1, col2, col3, col4, col5, col6), ref1.table, listOf(ref1, ref2, ref3, ref4, ref5, ref6).apply { forEach { require(it.table==ref1.table) } }))
     }
   }
 
-  inline fun <T1:Any, T2:Any, T3:Any, T4:Any, T5:Any, T6:Any> FOREIGN_KEY(col1: ColumnRef<T1>, col2:ColumnRef<T2>, col3:ColumnRef<T3>, col4: ColumnRef<T4>, col5:ColumnRef<T5>, col6:ColumnRef<T6>) =
+  inline fun <T1:Any, S1:ColumnType<T1,S1>, T2:Any, S2:ColumnType<T2,S2>, T3:Any, S3:ColumnType<T3,S3>, T4:Any, S4:ColumnType<T4,S4>, T5:Any, S5:ColumnType<T5,S5>, T6:Any, S6:ColumnType<T6,S6>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>, col3:ColumnRef<T3, S3>, col4: ColumnRef<T4, S4>, col5:ColumnRef<T5, S5>, col6:ColumnRef<T6, S6>) =
       __FOREIGN_KEY__6(this, col1,col2,col3,col4,col5,col6)
 
 
-  class __FOREIGN_KEY__5<T1:Any, T2:Any, T3:Any, T4:Any, T5:Any>(val configuration:TableConfiguration, val col1:ColumnRef<T1>, val col2:ColumnRef<T2>, val col3:ColumnRef<T3>, val col4:ColumnRef<T4>, val col5:ColumnRef<T5>) {
-    inline fun REFERENCES(ref1:ColumnRef<T1>, ref2:ColumnRef<T2>, ref3:ColumnRef<T3>, ref4:ColumnRef<T4>, ref5:ColumnRef<T5>) {
+  class __FOREIGN_KEY__5<T1:Any, S1:ColumnType<T1,S1>, T2:Any, S2:ColumnType<T2,S2>, T3:Any, S3:ColumnType<T3,S3>, T4:Any, S4:ColumnType<T4,S4>, T5:Any, S5:ColumnType<T5,S5>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>, val col3:ColumnRef<T3, S3>, val col4:ColumnRef<T4, S4>, val col5:ColumnRef<T5, S5>) {
+    inline fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>, ref3:ColumnRef<T3, S3>, ref4:ColumnRef<T4, S4>, ref5:ColumnRef<T5, S5>) {
       configuration.foreignKeys.add(ForeignKey(listOf(col1, col2, col3, col4, col5), ref1.table, listOf(ref1, ref2, ref3, ref4, ref5).apply { forEach { require(it.table==ref1.table) } }))
     }
   }
 
-  inline fun <T1:Any, T2:Any, T3:Any, T4:Any, T5:Any> FOREIGN_KEY(col1: ColumnRef<T1>, col2:ColumnRef<T2>, col3:ColumnRef<T3>, col4: ColumnRef<T4>, col5:ColumnRef<T5>) =
+  inline fun <T1:Any, S1:ColumnType<T1,S1>, T2:Any, S2:ColumnType<T2,S2>, T3:Any, S3:ColumnType<T3,S3>, T4:Any, S4:ColumnType<T4,S4>, T5:Any, S5:ColumnType<T5,S5>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>, col3:ColumnRef<T3, S3>, col4: ColumnRef<T4, S4>, col5:ColumnRef<T5, S5>) =
       __FOREIGN_KEY__5(this, col1,col2,col3,col4,col5)
 
-  class __FOREIGN_KEY__4<T1:Any, T2:Any, T3:Any, T4:Any>(val configuration:TableConfiguration, val col1:ColumnRef<T1>, val col2:ColumnRef<T2>, val col3:ColumnRef<T3>, val col4:ColumnRef<T4>) {
-    inline fun REFERENCES(ref1:ColumnRef<T1>, ref2:ColumnRef<T2>, ref3:ColumnRef<T3>, ref4:ColumnRef<T4>) {
+  class __FOREIGN_KEY__4<T1:Any, S1:ColumnType<T1,S1>, T2:Any, S2:ColumnType<T2,S2>, T3:Any, S3:ColumnType<T3,S3>, T4:Any, S4:ColumnType<T4,S4>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>, val col3:ColumnRef<T3, S3>, val col4:ColumnRef<T4, S4>) {
+    inline fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>, ref3:ColumnRef<T3, S3>, ref4:ColumnRef<T4, S4>) {
       configuration.foreignKeys.add(ForeignKey(listOf(col1, col2, col3, col4), ref1.table, listOf(ref1, ref2, ref3, ref4)))
     }
   }
 
-  inline fun <T1:Any, T2:Any, T3:Any, T4:Any> FOREIGN_KEY(col1: ColumnRef<T1>, col2:ColumnRef<T2>, col3:ColumnRef<T3>, col4: ColumnRef<T4>) =
+  inline fun <T1:Any, S1:ColumnType<T1,S1>, T2:Any, S2:ColumnType<T2,S2>, T3:Any, S3:ColumnType<T3,S3>, T4:Any, S4:ColumnType<T4,S4>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>, col3:ColumnRef<T3, S3>, col4: ColumnRef<T4, S4>) =
       __FOREIGN_KEY__4(this, col1,col2,col3,col4)
 
-  class __FOREIGN_KEY__3<T1:Any, T2:Any, T3:Any>(val configuration:TableConfiguration, val col1:ColumnRef<T1>, val col2:ColumnRef<T2>, val col3:ColumnRef<T3>) {
-    inline fun REFERENCES(ref1:ColumnRef<T1>, ref2:ColumnRef<T2>, ref3:ColumnRef<T3>) {
+  class __FOREIGN_KEY__3<T1:Any, S1:ColumnType<T1,S1>, T2:Any, S2:ColumnType<T2,S2>, T3:Any, S3:ColumnType<T3,S3>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>, val col3:ColumnRef<T3, S3>) {
+    inline fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>, ref3:ColumnRef<T3, S3>) {
       configuration.foreignKeys.add(ForeignKey(listOf(col1, col2, col3), ref1.table, listOf(ref1, ref2, ref3).apply { forEach { require(it.table==ref1.table) } }))
     }
   }
 
-  inline fun <T1:Any, T2:Any, T3:Any> FOREIGN_KEY(col1: ColumnRef<T1>, col2:ColumnRef<T2>, col3:ColumnRef<T3>) =
+  inline fun <T1:Any, S1:ColumnType<T1,S1>, T2:Any, S2:ColumnType<T2,S2>, T3:Any, S3:ColumnType<T3,S3>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>, col3:ColumnRef<T3, S3>) =
       __FOREIGN_KEY__3(this, col1,col2,col3)
 
-  class __FOREIGN_KEY__2<T1:Any, T2:Any>(val configuration:TableConfiguration, val col1:ColumnRef<T1>, val col2:ColumnRef<T2>) {
-    inline fun REFERENCES(ref1:ColumnRef<T1>, ref2:ColumnRef<T2>) {
+  class __FOREIGN_KEY__2<T1:Any, S1:ColumnType<T1,S1>, T2:Any, S2:ColumnType<T2,S2>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>) {
+    inline fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>) {
       configuration.foreignKeys.add(ForeignKey(listOf(col1, col2), ref1.table, listOf(ref1, ref2).apply { require(ref2.table==ref1.table) }))
     }
   }
 
-  inline fun <T1:Any, T2:Any> FOREIGN_KEY(col1: ColumnRef<T1>, col2:ColumnRef<T2>) =
+  inline fun <T1:Any, S1:ColumnType<T1,S1>, T2:Any, S2:ColumnType<T2,S2>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>) =
       __FOREIGN_KEY__2(this, col1,col2)
 
-  class __FOREIGN_KEY__1<T1:Any>(val configuration:TableConfiguration, val col1:ColumnRef<T1>) {
-    inline fun REFERENCES(ref1:ColumnRef<T1>) {
+  class __FOREIGN_KEY__1<T1:Any, S1:ColumnType<T1,S1>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1>) {
+    inline fun REFERENCES(ref1:ColumnRef<T1, S1>) {
       configuration.foreignKeys.add(ForeignKey(listOf(col1), ref1.table, listOf(ref1)))
     }
   }
 
-  inline fun <T1:Any> FOREIGN_KEY(col1: ColumnRef<T1>) =
+  inline fun <T1:Any, S1:ColumnType<T1,S1>> FOREIGN_KEY(col1: ColumnRef<T1, S1>) =
       __FOREIGN_KEY__1(this, col1)
 
 }
@@ -407,11 +408,11 @@ class DatabaseConfiguration {
  *                  engine or charset to use.
  */
 abstract class Table private constructor(override val _name: String,
-                                         val _cols: List<uk.ac.bournemouth.kotlinsql.Column<*>>,
-                                         val _primaryKey: List<uk.ac.bournemouth.kotlinsql.Column<*>>?,
+                                         val _cols: List<uk.ac.bournemouth.kotlinsql.Column<*, *>>,
+                                         val _primaryKey: List<uk.ac.bournemouth.kotlinsql.Column<*, *>>?,
                                          val _foreignKeys: List<uk.ac.bournemouth.kotlinsql.ForeignKey>,
-                                         val _uniqueKeys: List<List<uk.ac.bournemouth.kotlinsql.Column<*>>>,
-                                         val _indices: List<List<uk.ac.bournemouth.kotlinsql.Column<*>>>,
+                                         val _uniqueKeys: List<List<uk.ac.bournemouth.kotlinsql.Column<*, *>>>,
+                                         val _indices: List<List<uk.ac.bournemouth.kotlinsql.Column<*, *>>>,
                                          val _extra: String?) : uk.ac.bournemouth.kotlinsql.TableRef {
 
   private constructor(c: uk.ac.bournemouth.kotlinsql.TableConfiguration):this(c._name, c.cols, c.primaryKey?.let {c.cols.resolve(it)}, c.foreignKeys, c.uniqueKeys.map({c.cols.resolve(it)}), c.indices.map({c.cols.resolve(it)}), c.extra)
@@ -424,30 +425,30 @@ abstract class Table private constructor(override val _name: String,
 
   companion object {
 
-    private fun List<uk.ac.bournemouth.kotlinsql.Column<*>>.resolve(ref: uk.ac.bournemouth.kotlinsql.ColumnRef<*>) = find { it.name == ref.name } ?: throw java.util.NoSuchElementException(
+    private fun List<uk.ac.bournemouth.kotlinsql.Column<*, *>>.resolve(ref: uk.ac.bournemouth.kotlinsql.ColumnRef<*,*>) = find { it.name == ref.name } ?: throw java.util.NoSuchElementException(
           "No column with the name ${ref.name} could be found")
 
-    private fun List<uk.ac.bournemouth.kotlinsql.Column<*>>.resolve(refs: List<uk.ac.bournemouth.kotlinsql.ColumnRef<*>>) = refs.map { resolve(it) }
+    private fun List<uk.ac.bournemouth.kotlinsql.Column<*, *>>.resolve(refs: List<uk.ac.bournemouth.kotlinsql.ColumnRef<*,*>>) = refs.map { resolve(it) }
 
   }
 
-  fun resolve(ref: uk.ac.bournemouth.kotlinsql.ColumnRef<*>) : uk.ac.bournemouth.kotlinsql.Column<*> = (_cols.find {it.name==ref.name}) !!
+  fun resolve(ref: uk.ac.bournemouth.kotlinsql.ColumnRef<*,*>) : uk.ac.bournemouth.kotlinsql.Column<*, *> = (_cols.find {it.name==ref.name}) !!
 
   fun ref(): uk.ac.bournemouth.kotlinsql.TableRef = uk.ac.bournemouth.kotlinsql.TableRefImpl(_name)
 
   fun field(name:String) = _cols.firstOrNull {it.name==name}
 
-  operator fun <T:Any> get(thisRef: uk.ac.bournemouth.kotlinsql.Table, property: kotlin.reflect.KProperty<out uk.ac.bournemouth.kotlinsql.Column<T>>): uk.ac.bournemouth.kotlinsql.Column<T> {
-    return field(property.name) as uk.ac.bournemouth.kotlinsql.Column<T>
+  operator fun <T:Any, S: ColumnType<T, S>> get(thisRef: uk.ac.bournemouth.kotlinsql.Table, property: kotlin.reflect.KProperty<out uk.ac.bournemouth.kotlinsql.Column<T, S>>): uk.ac.bournemouth.kotlinsql.Column<T, S> {
+    return field(property.name) as uk.ac.bournemouth.kotlinsql.Column<T, S>
   }
 
-  protected fun <T:Any> type(type: uk.ac.bournemouth.kotlinsql.ColumnType<T>) = uk.ac.bournemouth.kotlinsql.Table.FieldAccessor<T>(
+  protected fun <T:Any, S: ColumnType<T, S>> type(type: uk.ac.bournemouth.kotlinsql.ColumnType<T, S>) = uk.ac.bournemouth.kotlinsql.Table.FieldAccessor<T, S>(
         type)
 
-  open protected class FieldAccessor<T:Any>(val type: uk.ac.bournemouth.kotlinsql.ColumnType<T>) {
-    lateinit var value: uk.ac.bournemouth.kotlinsql.Column<T>
+  open protected class FieldAccessor<T:Any, S: ColumnType<T, S>>(val type: uk.ac.bournemouth.kotlinsql.ColumnType<T, S>) {
+    lateinit var value: uk.ac.bournemouth.kotlinsql.Column<T, S>
     open fun name(property: kotlin.reflect.KProperty<*>) = property.name
-    operator fun getValue(thisRef: uk.ac.bournemouth.kotlinsql.Table, property: kotlin.reflect.KProperty<*>): uk.ac.bournemouth.kotlinsql.Column<T> {
+    operator fun getValue(thisRef: uk.ac.bournemouth.kotlinsql.Table, property: kotlin.reflect.KProperty<*>): uk.ac.bournemouth.kotlinsql.Column<T, S> {
       if (value==null) {
         value = type.cast(thisRef.field(property.name)?: throw IllegalArgumentException("There is no field with the given name ${property.name}"))
       }
@@ -455,11 +456,11 @@ abstract class Table private constructor(override val _name: String,
     }
   }
 
-  protected fun <T:Any> name(name:String, type: uk.ac.bournemouth.kotlinsql.ColumnType<T>) = uk.ac.bournemouth.kotlinsql.Table.NamedFieldAccessor<T>(
+  protected fun <T:Any, S: ColumnType<T, S>> name(name:String, type: uk.ac.bournemouth.kotlinsql.ColumnType<T, S>) = uk.ac.bournemouth.kotlinsql.Table.NamedFieldAccessor<T, S>(
         name,
         type)
 
-  final protected class NamedFieldAccessor<T:Any>(val name:String, type: uk.ac.bournemouth.kotlinsql.ColumnType<T>): uk.ac.bournemouth.kotlinsql.Table.FieldAccessor<T>(type) {
+  final protected class NamedFieldAccessor<T:Any, S: ColumnType<T, S>>(val name:String, type: uk.ac.bournemouth.kotlinsql.ColumnType<T, S>): uk.ac.bournemouth.kotlinsql.Table.FieldAccessor<T, S>(type) {
     override fun name(property: kotlin.reflect.KProperty<*>): String = this.name
   }
 

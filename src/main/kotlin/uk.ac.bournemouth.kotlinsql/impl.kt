@@ -24,18 +24,19 @@ package uk.ac.bournemouth.kotlinsql
  * Implementation for the database API
  */
 
-open class ColumnImpl<T:Any>(override val table:TableRef,
-                             override val type: ColumnType<T>,
-                             override val name: String,
-                             override val notnull: Boolean?,
-                             override val unique: Boolean,
-                             override val autoincrement: Boolean,
-                             override val default: T?,
-                             override val comment:String?,
-                             override val columnFormat: ColumnConfiguration.ColumnFormat?,
-                             override val storageFormat: ColumnConfiguration.StorageFormat?,
-                             override val references:ColsetRef?): Column<T> {
-  constructor(configuration: ColumnConfiguration<T>):
+open class ColumnImpl<T:Any, S: ColumnType<T, S>>(
+      override val table: TableRef,
+      override val type: S,
+      override val name: String,
+      override val notnull: Boolean?,
+      override val unique: Boolean,
+      override val autoincrement: Boolean,
+      override val default: T?,
+      override val comment: String?,
+      override val columnFormat: ColumnConfiguration.ColumnFormat?,
+      override val storageFormat: ColumnConfiguration.StorageFormat?,
+      override val references: ColsetRef?) : Column<T, S> {
+  constructor(configuration: ColumnConfiguration<T, S>):
       this(table=configuration.table,
            type=configuration.type,
            name=configuration.name,
@@ -48,7 +49,7 @@ open class ColumnImpl<T:Any>(override val table:TableRef,
            storageFormat=configuration.storageFormat,
            references=configuration.references)
   
-  override fun ref():ColumnRef<T> = this
+  override fun ref():ColumnRef<T, S> = this
 }
 
 class TableRefImpl(override val _name: String) : TableRef {}
