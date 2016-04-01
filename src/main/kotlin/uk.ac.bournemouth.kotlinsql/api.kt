@@ -51,7 +51,9 @@ abstract class Database private constructor(val _version:Int, val _tables:List<o
 
 }
 
+/** A reference to a table. */
 interface TableRef {
+  /** The name of the table. */
   val _name:String
 }
 
@@ -328,18 +330,16 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
   inline fun <T1:Any> FOREIGN_KEY(col1: ColumnRef<T1>) =
       __FOREIGN_KEY__1(this, col1)
 
-  fun toTable(): Table {
-    return Table(_name, cols, primaryKey, foreignKeys, uniqueKeys, indices, extra)
-  }
-
 }
 
 class DatabaseConfiguration {
 
+  private class __AnonymousTable(name:String, extra: String?, block:TableConfiguration.()->Unit): Table(name,extra, block)
+
   val tables = mutableListOf<Table>()
 
-  inline fun table(name:String, extra: String? = null, block:TableConfiguration.()->Unit):TableRef {
-    return TableConfiguration(name, extra).apply { block() }.toTable().apply { tables.add(this) }.ref()
+  fun table(name:String, extra: String? = null, block:TableConfiguration.()->Unit):TableRef {
+    return __AnonymousTable(name, extra, block)
   }
 
   inline fun table(t:Table):TableRef {
