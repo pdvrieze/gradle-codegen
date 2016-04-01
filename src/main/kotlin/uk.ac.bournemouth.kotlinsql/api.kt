@@ -115,6 +115,8 @@ interface Column<T:Any, S: ColumnType<T, S>>: ColumnRef<T,S> {
   val columnFormat: ColumnConfiguration.ColumnFormat?
   val storageFormat: ColumnConfiguration.StorageFormat?
   val references:ColsetRef?
+
+  fun toDDL(): CharSequence
 }
 
 interface BoundedType {
@@ -212,6 +214,12 @@ open class NumberColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef,
 
 }
 
+interface NumericColumn<T:Any, S: ColumnType<T, S>>: Column<T,S> {
+  val unsigned: Boolean
+  val zerofill: Boolean
+  val displayLength: Int
+}
+
 open class CharColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S): ColumnConfiguration<T, S>(table, name, type) {
   var charset: String? = null
   var collation: String? = null
@@ -236,7 +244,14 @@ interface LengthColumnConfiguration<T:Any, S: ColumnType<T,S>> {
 
 class SimpleLengthColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, override val length: Int): ColumnConfiguration<T, S>(table, name, type), LengthColumnConfiguration<T, S>
 
-class ForeignKey constructor(private val fromCols:List<ColumnRef<*,*>>, private val toTable:TableRef, private val toCols:List<ColumnRef<*,*>>)
+class ForeignKey constructor(private val fromCols:List<ColumnRef<*,*>>, private val toTable:TableRef, private val toCols:List<ColumnRef<*,*>>) {
+  internal fun toDDL(): CharSequence {
+    val transform: (ColumnRef<*,*>) -> CharSequence = { it.name }
+    val result = fromCols.joinTo(StringBuilder(), "`, `", "FOREIGN KEY (`", "`) REFERENCES ", transform = transform)
+    result.append(toTable._name)
+    return toCols.joinTo(result, "`, `", "`)", transform = transform)
+  }
+}
 
 /**
  * The main class that caries a lot of the load for the class.
@@ -411,10 +426,11 @@ interface Table:TableRef {
   fun ref(): TableRef
   fun resolve(ref: ColumnRef<*, *>): Column<*, *>
 
-  interface FieldAccessor<T:Any, S:ColumnType<T,S>> {
+  interface FieldAccessor<T:Any, S:ColumnType<T,S>, C:Column<T,S>> {
     operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): Column<T, S>
   }
 
+  fun appendDDL(appendable: Appendable)
 }
 
 /**
@@ -463,7 +479,7 @@ abstract class ImmutableTable private constructor(override val _name: String,
   constructor(name:String, extra: String? = null, block: TableConfiguration.()->Unit): this(
         TableConfiguration(name, extra).apply(block)  )
 
-  protected fun <T:Any, S: ColumnType<T, S>> type(type: ColumnType<T, S>) = TypeFieldAccessor<T, S>(
+  protected fun <T:Any, S: ColumnType<T, S>, C:Column<T,S>> type(type: ColumnType<T, S>) = TypeFieldAccessor<T, S, C>(
         type)
 
 }

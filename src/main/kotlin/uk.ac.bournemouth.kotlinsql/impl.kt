@@ -22,11 +22,15 @@ package uk.ac.bournemouth.kotlinsql
 
 import kotlin.reflect.KProperty
 
+
+internal val LINE_SEPARATOR: String by lazy { System.getProperty("line.separator")!! }
+
+internal interface AllColumns<T:Any, S:ColumnType<T,S>>: NumericColumn<T,S>
 /**
  * Implementation for the database API
  */
 
-open class ColumnImpl<T:Any, S: ColumnType<T, S>>(
+open class ColumnImpl<T:Any, S: ColumnType<T, S>, C:Column<T,S>> private constructor (
       override val table: TableRef,
       override val type: S,
       override val name: String,
@@ -37,7 +41,11 @@ open class ColumnImpl<T:Any, S: ColumnType<T, S>>(
       override val comment: String?,
       override val columnFormat: ColumnConfiguration.ColumnFormat?,
       override val storageFormat: ColumnConfiguration.StorageFormat?,
-      override val references: ColsetRef?) : Column<T, S> {
+      override val references: ColsetRef?,
+      override val unsigned:Boolean = false,
+      override val zerofill: Boolean = false,
+      override val displayLength: Int = -1
+) : AllColumns<T, S> {
   constructor(configuration: ColumnConfiguration<T, S>):
       this(table=configuration.table,
            type=configuration.type,
@@ -50,8 +58,32 @@ open class ColumnImpl<T:Any, S: ColumnType<T, S>>(
            columnFormat=configuration.columnFormat,
            storageFormat=configuration.storageFormat,
            references=configuration.references)
-  
+
+  constructor(configuration: NumberColumnConfiguration<T, S>):
+  this(table=configuration.table,
+       type=configuration.type,
+       name=configuration.name,
+       notnull=configuration.notnull,
+       unique=configuration.unique,
+       autoincrement=configuration.autoincrement,
+       default=configuration.default,
+       comment=configuration.comment,
+       columnFormat=configuration.columnFormat,
+       storageFormat=configuration.storageFormat,
+       references=configuration.references,
+       unsigned=configuration.unsigned,
+       zerofill=configuration.zerofill,
+       displayLength=configuration.displayLength)
+
   override fun ref():ColumnRef<T, S> = this
+
+  override fun toDDL(): CharSequence {
+    val result = StringBuilder()
+    result.append('`').append(name).append("` ").append(type.typeName)
+
+    return result
+  }
+
 }
 
 class TableRefImpl(override val _name: String) : TableRef {}
@@ -80,25 +112,43 @@ abstract class AbstractTable: Table {
     return field(property.name) as Column<T, S>
   }
 
-  open protected class TypeFieldAccessor<T:Any, S: ColumnType<T, S>>(val type: ColumnType<T, S>): Table.FieldAccessor<T, S> {
-    lateinit var value: Column<T, S>
+  open protected class TypeFieldAccessor<T:Any, S: ColumnType<T, S>, C:Column<T,S>>(val type: ColumnType<T, S>): Table.FieldAccessor<T, S, C> {
+    private var value: C? = null
     open fun name(property: kotlin.reflect.KProperty<*>) = property.name
-    override operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): Column<T, S> {
+    override operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): C {
       if (value==null) {
-        value = type.cast(thisRef.field(property.name)?: throw IllegalArgumentException("There is no field with the given name ${property.name}"))
+        val field = thisRef.field(property.name) ?: throw IllegalArgumentException("There is no field with the given name ${property.name}")
+        value = type.cast(field) as C
       }
-      return value
+      return value!!
     }
   }
 
   /** Property delegator to access database columns by name and type. */
-  protected fun <T:Any, S: ColumnType<T, S>> name(name:String, type: ColumnType<T, S>) = NamedFieldAccessor<T, S>(
+  protected fun <T:Any, S: ColumnType<T, S>, C: Column<T,S>> name(name:String, type: ColumnType<T, S>) = NamedFieldAccessor<T,S,C>(
         name,
         type)
 
-  final protected class NamedFieldAccessor<T:Any, S: ColumnType<T, S>>(val name:String, type: ColumnType<T, S>): TypeFieldAccessor<T, S>(type) {
+  final protected class NamedFieldAccessor<T:Any, S: ColumnType<T, S>, C:Column<T,S>>(val name:String, type: ColumnType<T, S>): TypeFieldAccessor<T, S, C>(type) {
     override fun name(property: kotlin.reflect.KProperty<*>): String = this.name
   }
 
+  private fun toDDL(first:CharSequence, cols: List<Column<*,*>>):CharSequence {
+    return StringBuilder(first).append(" (`").apply { cols.joinTo(this, "`, `") }.append("`)")
+  }
+
+  override fun appendDDL(appendable: Appendable) {
+    appendable.appendln("CREATE TABLE `${_name}` (")
+    sequenceOf(_cols.asSequence().map {it.toDDL()},
+               _primaryKey?.let {sequenceOf( toDDL("PRIMARY KEY", it))},
+               _indices.asSequence().map { toDDL("INDEX", it)},
+               _uniqueKeys.asSequence().map { toDDL("UNIQUE", it) },
+               _foreignKeys.asSequence().map { it.toDDL() })
+          .filterNotNull()
+          .flatten()
+          .joinTo(appendable, ",${LINE_SEPARATOR}  ")
+    appendable.appendln().append(')')
+    _extra?.let { appendable.append(' ').append(_extra)}
+  }
 }
 
