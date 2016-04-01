@@ -67,6 +67,14 @@ class ColsetRef(val table:TableRef, val columns:List<out ColumnRef<*>>) {
 
 interface Column<T:Any>: ColumnRef<T> {
   fun ref(): ColumnRef<T>
+  val notnull: Boolean?
+  val unique: Boolean
+  val autoincrement: Boolean
+  val default: T?
+  val comment:String?
+  val columnFormat: ColumnConfiguration.ColumnFormat?
+  val storageFormat: ColumnConfiguration.StorageFormat?
+  val references:ColsetRef?
 }
 
 interface BoundedType {

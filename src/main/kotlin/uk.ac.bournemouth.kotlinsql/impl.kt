@@ -26,15 +26,30 @@ import kotlin.reflect.KProperty
  * Implementation for the database API
  */
 
-open class ColumnImpl<T:Any>(override val table:TableRef, override val type: ColumnType<T>, override val name: String, val notnull: Boolean?, val unique: Boolean): Column<T> {
+open class ColumnImpl<T:Any>(override val table:TableRef,
+                             override val type: ColumnType<T>,
+                             override val name: String,
+                             override val notnull: Boolean?,
+                             override val unique: Boolean,
+                             override val autoincrement: Boolean,
+                             override val default: T?,
+                             override val comment:String?,
+                             override val columnFormat: ColumnConfiguration.ColumnFormat?,
+                             override val storageFormat: ColumnConfiguration.StorageFormat?,
+                             override val references:ColsetRef?): Column<T> {
   constructor(configuration: ColumnConfiguration<T>):
       this(table=configuration.table,
            type=configuration.type,
            name=configuration.name,
            notnull=configuration.notnull,
-           unique=configuration.unique) {
-
-  }
+           unique=configuration.unique,
+           autoincrement=configuration.autoincrement,
+           default=configuration.default,
+           comment=configuration.comment,
+           columnFormat=configuration.columnFormat,
+           storageFormat=configuration.storageFormat,
+           references=configuration.references)
+  
   override fun ref():ColumnRef<T> = this
 }
 
