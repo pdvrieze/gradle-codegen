@@ -25,12 +25,12 @@ import kotlin.reflect.KProperty
 
 internal val LINE_SEPARATOR: String by lazy { System.getProperty("line.separator")!! }
 
-internal interface AllColumns<T:Any, S:ColumnType<T,S>>: NumericColumn<T,S>
+internal interface AllColumns<T:Any, S:ColumnType<T,S>>: DecimalColumn<T,S>
 /**
  * Implementation for the database API
  */
 
-open class ColumnImpl<T:Any, S: ColumnType<T, S>, C:Column<T,S>> private constructor (
+open class ColumnImpl<T:Any, S: ColumnType<T, S>, out C:Column<T,S>> private constructor (
       override val table: TableRef,
       override val type: S,
       override val name: String,
@@ -44,7 +44,9 @@ open class ColumnImpl<T:Any, S: ColumnType<T, S>, C:Column<T,S>> private constru
       override val references: ColsetRef?,
       override val unsigned:Boolean = false,
       override val zerofill: Boolean = false,
-      override val displayLength: Int = -1
+      override val displayLength: Int = -1,
+      override val precision: Int = -1,
+      override val scale:Int = -1
 ) : AllColumns<T, S> {
   constructor(configuration: ColumnConfiguration<T, S>):
       this(table=configuration.table,
@@ -59,7 +61,7 @@ open class ColumnImpl<T:Any, S: ColumnType<T, S>, C:Column<T,S>> private constru
            storageFormat=configuration.storageFormat,
            references=configuration.references)
 
-  constructor(configuration: NumberColumnConfiguration<T, S>):
+  constructor(configuration: NumberColumnConfiguration<T, S, NumericColumn<T,S>>):
   this(table=configuration.table,
        type=configuration.type,
        name=configuration.name,
@@ -75,7 +77,29 @@ open class ColumnImpl<T:Any, S: ColumnType<T, S>, C:Column<T,S>> private constru
        zerofill=configuration.zerofill,
        displayLength=configuration.displayLength)
 
-  override fun ref():ColumnRef<T, S> = this
+  constructor(configuration: DecimalColumnConfiguration<T, S>):
+  this(table=configuration.table,
+       type=configuration.type,
+       name=configuration.name,
+       notnull=configuration.notnull,
+       unique=configuration.unique,
+       autoincrement=configuration.autoincrement,
+       default=configuration.default,
+       comment=configuration.comment,
+       columnFormat=configuration.columnFormat,
+       storageFormat=configuration.storageFormat,
+       references=configuration.references,
+       unsigned=configuration.unsigned,
+       zerofill=configuration.zerofill,
+       displayLength=configuration.displayLength,
+       precision = configuration.precision,
+       scale = configuration.scale)
+
+
+  @Suppress("UNCHECKED_CAST")
+  override fun ref():C {
+    return this as C
+  }
 
   override fun toDDL(): CharSequence {
     val result = StringBuilder()

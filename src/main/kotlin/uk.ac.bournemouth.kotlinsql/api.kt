@@ -203,7 +203,7 @@ open class ColumnConfiguration<T:Any, S: ColumnType<T,S>>(val table: TableRef, v
 
 }
 
-open class NumberColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S): ColumnConfiguration<T, S>(table, name, type) {
+open class NumberColumnConfiguration<T:Any, S: ColumnType<T,S>, C:NumericColumn<T,S>>(table: TableRef, name: String, type: S): ColumnConfiguration<T, S>(table, name, type) {
   var unsigned: Boolean = false
   var zerofill: Boolean = false
   var displayLength: Int = -1
@@ -233,7 +233,14 @@ open class CharColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, n
 
 final class LengthCharColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, override val length: Int): CharColumnConfiguration<T, S>(table, name, type), LengthColumnConfiguration<T, S>
 
-final class DecimalColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, val precision: Int, val scale: Int): NumberColumnConfiguration<T, S>(table, name, type) {
+
+interface DecimalColumn<T:Any, S: ColumnType<T, S>>: NumericColumn<T, S> {
+  val precision:Int
+  val scale:Int
+}
+
+
+final class DecimalColumnConfiguration<T:Any, S: ColumnType<T,S>>(table: TableRef, name: String, type: S, val precision: Int, val scale: Int): NumberColumnConfiguration<T, S, DecimalColumn<T,S>>(table, name, type) {
   val defaultPrecision=10
   val defaultScale=0
 }
@@ -270,13 +277,13 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
   /* Versions with configuration closure. */
   inline fun BIT(name:String, block: ColumnConfiguration<Boolean, BIT_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BIT_T).add(block)
   inline fun BIT(name:String, length:Int, block: ColumnConfiguration<Array<Boolean>, BITFIELD_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.BITFIELD_T).add(block)
-  inline fun TINYINT(name:String, block: NumberColumnConfiguration<Byte, TINYINT_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.TINYINT_T).add(block)
-  inline fun SMALLINT(name:String, block: NumberColumnConfiguration<Short, SMALLINT_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.SMALLINT_T).add(block)
-  inline fun MEDIUMINT(name:String, block: NumberColumnConfiguration<Int, MEDIUMINT_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.MEDIUMINT_T).add(block)
-  inline fun INT(name:String, block: NumberColumnConfiguration<Int, INT_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.INT_T).add(block)
-  inline fun BIGINT(name:String, block: NumberColumnConfiguration<Long, BIGINT_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.BIGINT_T).add(block)
-  inline fun FLOAT(name:String, block: NumberColumnConfiguration<Float, FLOAT_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.FLOAT_T).add(block)
-  inline fun DOUBLE(name:String, block: NumberColumnConfiguration<Double, DOUBLE_T>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.DOUBLE_T).add(block)
+  inline fun TINYINT(name:String, block: NumberColumnConfiguration<Byte, TINYINT_T, NumericColumn<Byte, TINYINT_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.TINYINT_T).add(block)
+  inline fun SMALLINT(name:String, block: NumberColumnConfiguration<Short, SMALLINT_T, NumericColumn<Short, SMALLINT_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.SMALLINT_T).add(block)
+  inline fun MEDIUMINT(name:String, block: NumberColumnConfiguration<Int, MEDIUMINT_T, NumericColumn<Int, MEDIUMINT_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.MEDIUMINT_T).add(block)
+  inline fun INT(name:String, block: NumberColumnConfiguration<Int, INT_T, NumericColumn<Int, INT_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.INT_T).add(block)
+  inline fun BIGINT(name:String, block: NumberColumnConfiguration<Long, BIGINT_T, NumericColumn<Long, BIGINT_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.BIGINT_T).add(block)
+  inline fun FLOAT(name:String, block: NumberColumnConfiguration<Float, FLOAT_T, NumericColumn<Float, FLOAT_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.FLOAT_T).add(block)
+  inline fun DOUBLE(name:String, block: NumberColumnConfiguration<Double, DOUBLE_T, NumericColumn<Double, DOUBLE_T>>.() -> Unit) = NumberColumnConfiguration(this, name, ColumnType.DOUBLE_T).add(block)
   inline fun DECIMAL(name:String, precision:Int=-1, scale:Int=-1, block: DecimalColumnConfiguration<BigDecimal, DECIMAL_T>.() -> Unit) = DecimalColumnConfiguration(this, name, ColumnType.DECIMAL_T, precision, scale).add(block)
   inline fun NUMERIC(name:String, precision:Int=-1, scale:Int=-1, block: DecimalColumnConfiguration<BigDecimal, NUMERIC_T>.() -> Unit) = DecimalColumnConfiguration(this, name, ColumnType.NUMERIC_T, precision, scale).add(block)
   inline fun DATE(name:String, block: ColumnConfiguration<java.sql.Date, DATE_T>.() -> Unit) = ColumnConfiguration(this, name, ColumnType.DATE_T).add(block)
