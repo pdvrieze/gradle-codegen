@@ -20,7 +20,12 @@
 
 package uk.ac.bournemouth.kotlinsql
 
-import uk.ac.bournemouth.kotlinsql.ColumnType.*
+import uk.ac.bournemouth.kotlinsql.ColumnType.NumericColumnType.*
+import uk.ac.bournemouth.kotlinsql.ColumnType.SimpleColumnType.*
+import uk.ac.bournemouth.kotlinsql.ColumnType.CharColumnType.*
+import uk.ac.bournemouth.kotlinsql.ColumnType.LengthCharColumnType.*
+import uk.ac.bournemouth.kotlinsql.ColumnType.LengthColumnType.*
+import uk.ac.bournemouth.kotlinsql.ColumnType.DecimalColumnType.*
 import java.math.BigDecimal
 import java.sql.Date
 import java.sql.Time
@@ -131,6 +136,8 @@ interface Column<T:Any, S: BaseColumnType<T, S>>: ColumnRef<T,S> {
   val references:ColsetRef?
 
   fun toDDL(): CharSequence
+
+  fun copyConfiguration(owner: Table): AbstractColumnConfiguration<T,S,Column<T,S>>
 }
 
 interface BoundedType {
@@ -143,6 +150,8 @@ interface BaseColumnType<T:Any, S: BaseColumnType<T, S>> {
 
   fun cast(column: Column<*, *>): Column<T, S>
   fun cast(value: Any): T
+
+  fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T,S, out Column<T,S>>
 }
 
 sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override val typeName:String, override val type: KClass<T>):BaseColumnType<T,S> {
@@ -161,40 +170,93 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
   }
 
   // @formatter:off
-  object BIT_T       : ColumnType<Boolean, BIT_T, Column<Boolean, BIT_T>>("BIT", Boolean::class), BoundedType { override val maxLen = 64 }
-  object BITFIELD_T  : ColumnType<Array<Boolean>, BITFIELD_T, Column<Array<Boolean>, BITFIELD_T>>("BIT", Array<Boolean>::class)
-  object TINYINT_T   : ColumnType<Byte, TINYINT_T, Column<Byte, TINYINT_T>>("BIGINT", Byte::class)
-  object SMALLINT_T  : ColumnType<Short, SMALLINT_T, Column<Short, SMALLINT_T>>("SMALLINT", Short::class)
-  object MEDIUMINT_T : ColumnType<Int, MEDIUMINT_T, Column<Int, MEDIUMINT_T>>("MEDIUMINT", Int::class)
-  object INT_T       : ColumnType<Int, INT_T, Column<Int, INT_T>>("INT", Int::class)
-  object BIGINT_T    : ColumnType<Long, BIGINT_T, Column<Long, BIGINT_T>>("BIGINT", Long::class)
 
-  object FLOAT_T     : ColumnType<Float, FLOAT_T, Column<Float, FLOAT_T>>("FLOAT", Float::class)
-  object DOUBLE_T    : ColumnType<Double, DOUBLE_T, Column<Double, DOUBLE_T>>("DOUBLE", Double::class)
+  sealed class NumericColumnType<T:Any, S: NumericColumnType<T, S>>(typeName: String, type: KClass<T>):ColumnType<T,S, NumericColumn<T,S>>(typeName, type) {
+    object TINYINT_T   : NumericColumnType<Byte, TINYINT_T>("BIGINT", Byte::class)
+    object SMALLINT_T  : NumericColumnType<Short, SMALLINT_T>("SMALLINT", Short::class)
+    object MEDIUMINT_T : NumericColumnType<Int, MEDIUMINT_T>("MEDIUMINT", Int::class)
+    object INT_T       : NumericColumnType<Int, INT_T>("INT", Int::class)
+    object BIGINT_T    : NumericColumnType<Long, BIGINT_T>("BIGINT", Long::class)
 
-  object DECIMAL_T   : ColumnType<BigDecimal, DECIMAL_T, Column<BigDecimal, DECIMAL_T>>("DECIMAL", BigDecimal::class)
-  object NUMERIC_T   : ColumnType<BigDecimal, NUMERIC_T, Column<BigDecimal, NUMERIC_T>>("NUMERIC", BigDecimal::class)
+    object FLOAT_T     : NumericColumnType<Float, FLOAT_T>("FLOAT", Float::class)
+    object DOUBLE_T    : NumericColumnType<Double, DOUBLE_T>("DOUBLE", Double::class)
 
-  object DATE_T      : ColumnType<java.sql.Date, DATE_T, Column<java.sql.Date, DATE_T>>("DATE", java.sql.Date::class)
-  object TIME_T      : ColumnType<java.sql.Time, TIME_T, Column<java.sql.Time, TIME_T>>("TIME", java.sql.Time::class)
-  object TIMESTAMP_T : ColumnType<java.sql.Timestamp, TIMESTAMP_T, Column<java.sql.Timestamp, TIMESTAMP_T>>("TIMESTAMP", java.sql.Timestamp::class)
-  object DATETIME_T  : ColumnType<java.sql.Timestamp, DATETIME_T, Column<java.sql.Timestamp, DATETIME_T>>("TIMESTAMP", java.sql.Timestamp::class)
-  object YEAR_T      : ColumnType<java.sql.Date, YEAR_T, Column<java.sql.Date, YEAR_T>>("YEAR", java.sql.Date::class)
+    override fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T, S, NumericColumn<T, S>> {
+      return NumberColumnConfiguration<T,S>(owner, refColumn.name, this as S)
+    }
+  }
 
-  object CHAR_T      : ColumnType<String, CHAR_T, Column<String, CHAR_T>>("CHAR", String::class), BoundedType { override val maxLen = 255 }
-  object VARCHAR_T   : ColumnType<String, VARCHAR_T, Column<String, VARCHAR_T>>("VARCHAR", String::class), BoundedType { override val maxLen = 0xffff }
+  sealed class DecimalColumnType<T:Any, S:DecimalColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, DecimalColumn<T,S>>(typeName, type) {
 
-  object BINARY_T    : ColumnType<ByteArray, BINARY_T, Column<ByteArray, BINARY_T>>("BINARY", ByteArray::class), BoundedType { override val maxLen = 255 }
-  object VARBINARY_T : ColumnType<ByteArray, VARBINARY_T, Column<ByteArray, VARBINARY_T>>("VARBINARY", ByteArray::class), BoundedType { override val maxLen = 0xffff }
-  object TINYBLOB_T  : ColumnType<ByteArray, TINYBLOB_T, Column<ByteArray, TINYBLOB_T>>("TINYBLOB", ByteArray::class), BoundedType { override val maxLen = 255 }
-  object BLOB_T      : ColumnType<ByteArray, BLOB_T, Column<ByteArray, BLOB_T>>("BLOB", ByteArray::class), BoundedType { override val maxLen = 0xffff }
-  object MEDIUMBLOB_T: ColumnType<ByteArray, MEDIUMBLOB_T, Column<ByteArray, MEDIUMBLOB_T>>("MEDIUMBLOB", ByteArray::class), BoundedType { override val maxLen = 0xffffff }
-  object LONGBLOB_T  : ColumnType<ByteArray, LONGBLOB_T, Column<ByteArray, LONGBLOB_T>>("LONGBLOB", ByteArray::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
+    object DECIMAL_T   : DecimalColumnType<BigDecimal, DECIMAL_T>("DECIMAL", BigDecimal::class)
+    object NUMERIC_T   : DecimalColumnType<BigDecimal, NUMERIC_T>("NUMERIC", BigDecimal::class)
 
-  object TINYTEXT_T  : ColumnType<String, TINYTEXT_T, Column<String, TINYTEXT_T>>("TINYTEXT", String::class), BoundedType { override val maxLen = 255 }
-  object TEXT_T      : ColumnType<String, TEXT_T, Column<String, TEXT_T>>("TEXT", String::class), BoundedType { override val maxLen = 0xffff }
-  object MEDIUMTEXT_T: ColumnType<String, MEDIUMTEXT_T, Column<String, MEDIUMTEXT_T>>("MEDIUMTEXT", String::class), BoundedType { override val maxLen = 0xffffff }
-  object LONGTEXT_T  : ColumnType<String, LONGTEXT_T, Column<String, LONGTEXT_T>>("LONGTEXT", String::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
+    override fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T, S, DecimalColumn<T, S>> {
+      refColumn as DecimalColumn<T,S>
+      return DecimalColumnConfiguration<T,S>(owner, refColumn.name, this as S, refColumn.precision, refColumn.scale)
+    }
+  }
+
+  sealed class SimpleColumnType<T:Any, S:SimpleColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, Column<T,S>>(typeName, type) {
+
+    object BIT_T       : SimpleColumnType<Boolean, BIT_T>("BIT", Boolean::class), BoundedType { override val maxLen = 64 }
+
+    object DATE_T      : SimpleColumnType<java.sql.Date, DATE_T>("DATE", java.sql.Date::class)
+    object TIME_T      : SimpleColumnType<java.sql.Time, TIME_T>("TIME", java.sql.Time::class)
+    object TIMESTAMP_T : SimpleColumnType<java.sql.Timestamp, TIMESTAMP_T>("TIMESTAMP", java.sql.Timestamp::class)
+    object DATETIME_T  : SimpleColumnType<java.sql.Timestamp, DATETIME_T>("TIMESTAMP", java.sql.Timestamp::class)
+    object YEAR_T      : SimpleColumnType<java.sql.Date, YEAR_T>("YEAR", java.sql.Date::class)
+
+    object TINYBLOB_T  : SimpleColumnType<ByteArray, TINYBLOB_T>("TINYBLOB", ByteArray::class), BoundedType { override val maxLen = 255 }
+    object BLOB_T      : SimpleColumnType<ByteArray, BLOB_T>("BLOB", ByteArray::class), BoundedType { override val maxLen = 0xffff }
+    object MEDIUMBLOB_T: SimpleColumnType<ByteArray, MEDIUMBLOB_T>("MEDIUMBLOB", ByteArray::class), BoundedType { override val maxLen = 0xffffff }
+    object LONGBLOB_T  : SimpleColumnType<ByteArray, LONGBLOB_T>("LONGBLOB", ByteArray::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
+
+    override fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T, S, Column<T, S>> {
+      return NormalColumnConfiguration<T,S>(owner, refColumn.name, this as S)
+    }
+
+  }
+
+  sealed class CharColumnType<T:Any, S:CharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, CharColumn<T,S>>(typeName, type) {
+
+    object TINYTEXT_T  : CharColumnType<String, TINYTEXT_T>("TINYTEXT", String::class), BoundedType { override val maxLen = 255 }
+    object TEXT_T      : CharColumnType<String, TEXT_T>("TEXT", String::class), BoundedType { override val maxLen = 0xffff }
+    object MEDIUMTEXT_T: CharColumnType<String, MEDIUMTEXT_T>("MEDIUMTEXT", String::class), BoundedType { override val maxLen = 0xffffff }
+    object LONGTEXT_T  : CharColumnType<String, LONGTEXT_T>("LONGTEXT", String::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
+
+    override fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T, S, Column<T, S>> {
+      return CharColumnConfiguration<T,S>(owner, refColumn.name, this as S)
+    }
+
+  }
+
+  sealed class LengthColumnType<T:Any, S:LengthColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthColumn<T,S>>(typeName, type) {
+
+    object BITFIELD_T  : LengthColumnType<Array<Boolean>, BITFIELD_T>("BIT", Array<Boolean>::class)
+
+    object BINARY_T    : LengthColumnType<ByteArray, BINARY_T>("BINARY", ByteArray::class), BoundedType { override val maxLen = 255 }
+    object VARBINARY_T : LengthColumnType<ByteArray, VARBINARY_T>("VARBINARY", ByteArray::class), BoundedType { override val maxLen = 0xffff }
+
+    override fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T, S, Column<T, S>> {
+      return LengthColumnConfiguration<T,S>(owner, refColumn.name, this as S, (refColumn as LengthColumn).length)
+    }
+
+  }
+
+  sealed class LengthCharColumnType<T:Any, S:LengthCharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthCharColumn<T,S>>(typeName, type) {
+
+    object CHAR_T      : LengthCharColumnType<String, CHAR_T>("CHAR", String::class), BoundedType { override val maxLen = 255 }
+    object VARCHAR_T   : LengthCharColumnType<String, VARCHAR_T>("VARCHAR", String::class), BoundedType { override val maxLen = 0xffff }
+
+    override fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T, S, Column<T, S>> {
+      return LengthCharColumnConfiguration<T,S>(owner, refColumn.name, this as S, (refColumn as LengthCharColumn).length)
+    }
+
+  }
+
+
+
 
   /*
   ENUM(value1,value2,value3,...) [CHARACTER SET charset_name] [COLLATE collation_name]

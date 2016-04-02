@@ -213,6 +213,9 @@ open class ColumnImpl<T:Any, S: BaseColumnType<T, S>, out C:Column<T,S>> private
     return result
   }
 
+  override fun copyConfiguration(owner: Table): AbstractColumnConfiguration<T, S, Column<T, S>> {
+    return type.newConfiguration(owner, this)
+  }
 }
 
 class TableRefImpl(override val _name: String) : TableRef {}

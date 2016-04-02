@@ -23,7 +23,7 @@ package uk.ac.bournemouth.kotlinsql
 /**
  * Created by pdvrieze on 01/04/16.
  */
-sealed abstract class AbstractColumnConfiguration<T:Any, S: BaseColumnType<T, S>,C: Column<T, S>>(val table: TableRef, val name: String, val type: S) {
+sealed abstract class AbstractColumnConfiguration<T:Any, S: BaseColumnType<T, S>,out C: Column<T, S>>(val table: TableRef, val name: String, val type: S) {
 
   enum class ColumnFormat { FIXED, MEMORY, DEFAULT }
   enum class StorageFormat { DISK, MEMORY, DEFAULT }

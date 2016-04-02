@@ -21,7 +21,12 @@
 package uk.ac.bournemouth.kotlinsql
 
 import java.math.BigDecimal
-import uk.ac.bournemouth.kotlinsql.ColumnType.*
+import uk.ac.bournemouth.kotlinsql.ColumnType.NumericColumnType.*
+import uk.ac.bournemouth.kotlinsql.ColumnType.SimpleColumnType.*
+import uk.ac.bournemouth.kotlinsql.ColumnType.CharColumnType.*
+import uk.ac.bournemouth.kotlinsql.ColumnType.LengthCharColumnType.*
+import uk.ac.bournemouth.kotlinsql.ColumnType.LengthColumnType.*
+import uk.ac.bournemouth.kotlinsql.ColumnType.DecimalColumnType.*
 import java.sql.Date
 import java.sql.Time
 import java.sql.Timestamp
@@ -164,6 +169,16 @@ abstract class MutableTable private constructor(name: String?,
   protected fun MEDIUMTEXT(name:String) = CharColumnConfiguration(this, name, MEDIUMTEXT_T).add({})
   protected fun LONGTEXT(name: String) = CharColumnConfiguration(this, name, LONGTEXT_T).add({})
 
+  /* When there is no body, the configuration subtype does not matter */
+  protected fun <T:Any, S:BaseColumnType<T,S>, C:Column<T,S>>reference(other: C) = other.copyConfiguration(this).add({})
+
+  /* Otherwise, the various types need to be distinguished. The different subtypes of column are needed for overload resolution */
+  protected fun <T:Any, S:BaseColumnType<T,S>>reference(other: DecimalColumn<T,S>, block: DecimalColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(this).add({})
+  protected fun <T:Any, S:BaseColumnType<T,S>>reference(other: LengthCharColumn<T,S>, block: LengthCharColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(this).add({})
+  protected fun <T:Any, S:BaseColumnType<T,S>>reference(other: CharColumn<T,S>, block: CharColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(this).add({})
+  protected fun <T:Any, S:BaseColumnType<T,S>>reference(other: Column<T,S>, block: NormalColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(this).add({})
+  protected fun <T:Any, S:BaseColumnType<T,S>>reference(other: LengthColumn<T,S>, block: LengthColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(this).add({})
+  protected fun <T:Any, S:BaseColumnType<T,S>>reference(other: NumericColumn<T,S>, block: NumberColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(this).add({})
 
   protected fun INDEX(col1: ColumnRef<*, *>, vararg cols: ColumnRef<*,*>) { __indices.add(mutableListOf(resolve(col1)).apply { addAll(resolve(cols)) })}
   protected fun UNIQUE(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { __uniqueKeys.add(mutableListOf(resolve(col1)).apply { addAll(resolve(cols)) })}
