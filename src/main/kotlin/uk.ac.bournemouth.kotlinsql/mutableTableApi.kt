@@ -62,9 +62,15 @@ import uk.ac.bournemouth.kotlinsql.AbstractColumnConfiguration.AbstractCharColum
  * @property _extra Extra table configuration to be appended after the definition. This contains information such as the
  *                  engine or charset to use.
  */
+// Note that the overloadResolver parameter on the primary constructor is there purely to fix overload resolving
 @Suppress("NOTHING_TO_INLINE")
-abstract class MutableTable constructor(override val _name: String,
-                                                override val _extra: String? = null) : AbstractTable() {
+abstract class MutableTable private constructor(name: String?,
+                                        override val _extra: String?, overloadResolver:Unit) : AbstractTable() {
+
+  constructor(extra:String?=null): this(null, extra, Unit)
+  constructor(name:String, extra: String?): this(name, extra, Unit)
+
+  override val _name:String = if (name==null) javaClass.simpleName else name
 
   override val _cols: List<Column<*, *>> = mutableListOf()
   
