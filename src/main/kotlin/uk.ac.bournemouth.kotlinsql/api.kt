@@ -20,6 +20,7 @@
 
 package uk.ac.bournemouth.kotlinsql
 
+import uk.ac.bournemouth.kotlinsql.ColumnType.*
 import uk.ac.bournemouth.kotlinsql.ColumnType.NumericColumnType.*
 import uk.ac.bournemouth.kotlinsql.ColumnType.SimpleColumnType.*
 import uk.ac.bournemouth.kotlinsql.ColumnType.CharColumnType.*
@@ -124,22 +125,6 @@ class ColsetRef(val table:TableRef, val columns:List<out ColumnRef<*, *>>) {
   constructor(table:TableRef, col1: ColumnRef<*, *>, vararg cols:ColumnRef<*, *>): this(table, mutableListOf(col1).apply { addAll(cols) })
 }
 
-interface Column<T:Any, S: BaseColumnType<T, S>>: ColumnRef<T,S> {
-  fun ref(): ColumnRef<T,S>
-  val notnull: Boolean?
-  val unique: Boolean
-  val autoincrement: Boolean
-  val default: T?
-  val comment:String?
-  val columnFormat: AbstractColumnConfiguration.ColumnFormat?
-  val storageFormat: AbstractColumnConfiguration.StorageFormat?
-  val references:ColsetRef?
-
-  fun toDDL(): CharSequence
-
-  fun copyConfiguration(owner: Table): AbstractColumnConfiguration<T,S,Column<T,S>>
-}
-
 interface BoundedType {
   val maxLen:Int
 }
@@ -170,8 +155,9 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
   }
 
   // @formatter:off
+  interface INumericColumnType<T:Any, S:INumericColumnType<T,S,C>, C:INumericColumn<T,S,C>>: BaseColumnType<T,S>
 
-  sealed class NumericColumnType<T:Any, S: NumericColumnType<T, S>>(typeName: String, type: KClass<T>):ColumnType<T,S, NumericColumn<T,S>>(typeName, type) {
+  sealed class NumericColumnType<T:Any, S: NumericColumnType<T, S>>(typeName: String, type: KClass<T>):ColumnType<T,S, NumericColumn<T,S>>(typeName, type), INumericColumnType<T,S, NumericColumn<T,S>> {
     object TINYINT_T   : NumericColumnType<Byte, TINYINT_T>("BIGINT", Byte::class)
     object SMALLINT_T  : NumericColumnType<Short, SMALLINT_T>("SMALLINT", Short::class)
     object MEDIUMINT_T : NumericColumnType<Int, MEDIUMINT_T>("MEDIUMINT", Int::class)
@@ -186,7 +172,7 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
     }
   }
 
-  sealed class DecimalColumnType<T:Any, S:DecimalColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, DecimalColumn<T,S>>(typeName, type) {
+  sealed class DecimalColumnType<T:Any, S:DecimalColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, DecimalColumn<T,S>>(typeName, type), INumericColumnType<T,S, DecimalColumn<T,S>> {
 
     object DECIMAL_T   : DecimalColumnType<BigDecimal, DECIMAL_T>("DECIMAL", BigDecimal::class)
     object NUMERIC_T   : DecimalColumnType<BigDecimal, NUMERIC_T>("NUMERIC", BigDecimal::class)
@@ -218,7 +204,9 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
 
   }
 
-  sealed class CharColumnType<T:Any, S:CharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, CharColumn<T,S>>(typeName, type) {
+  interface ICharColumnType<T:Any, S:ICharColumnType<T,S>>: BaseColumnType<T,S>
+
+  sealed class CharColumnType<T:Any, S:CharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, CharColumn<T,S>>(typeName, type), ICharColumnType<T,S> {
 
     object TINYTEXT_T  : CharColumnType<String, TINYTEXT_T>("TINYTEXT", String::class), BoundedType { override val maxLen = 255 }
     object TEXT_T      : CharColumnType<String, TEXT_T>("TEXT", String::class), BoundedType { override val maxLen = 0xffff }
@@ -231,7 +219,9 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
 
   }
 
-  sealed class LengthColumnType<T:Any, S:LengthColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthColumn<T,S>>(typeName, type) {
+  interface ILengthColumnType<T:Any, S:ILengthColumnType<T,S>>: BaseColumnType<T,S>
+
+  sealed class LengthColumnType<T:Any, S:LengthColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthColumn<T,S>>(typeName, type), ILengthColumnType<T,S> {
 
     object BITFIELD_T  : LengthColumnType<Array<Boolean>, BITFIELD_T>("BIT", Array<Boolean>::class)
 
@@ -244,7 +234,10 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
 
   }
 
-  sealed class LengthCharColumnType<T:Any, S:LengthCharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthCharColumn<T,S>>(typeName, type) {
+  interface ILengthCharColumnType<T:Any, S:ILengthCharColumnType<T,S>>:ICharColumnType<T,S>, ILengthColumnType<T,S>
+
+
+  sealed class LengthCharColumnType<T:Any, S:LengthCharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthCharColumn<T,S>>(typeName, type), ILengthCharColumnType<T,S> {
 
     object CHAR_T      : LengthCharColumnType<String, CHAR_T>("CHAR", String::class), BoundedType { override val maxLen = 255 }
     object VARCHAR_T   : LengthCharColumnType<String, VARCHAR_T>("VARCHAR", String::class), BoundedType { override val maxLen = 0xffff }
@@ -265,30 +258,53 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
   // @formatter:on
 }
 
-interface NumericColumn<T:Any, S: BaseColumnType<T, S>>: Column<T,S> {
+
+interface Column<T:Any, S: BaseColumnType<T, S>>: ColumnRef<T,S> {
+  fun ref(): ColumnRef<T,S>
+  val notnull: Boolean?
+  val unique: Boolean
+  val autoincrement: Boolean
+  val default: T?
+  val comment:String?
+  val columnFormat: AbstractColumnConfiguration.ColumnFormat?
+  val storageFormat: AbstractColumnConfiguration.StorageFormat?
+  val references:ColsetRef?
+
+  fun toDDL(): CharSequence
+
+  fun copyConfiguration(owner: Table): AbstractColumnConfiguration<T,S,Column<T,S>>
+}
+
+interface SimpleColumn<T:Any, S: SimpleColumnType<T, S>>: Column<T,S> {
+
+}
+
+
+interface INumericColumn<T:Any, S: INumericColumnType<T, S, C>,C:INumericColumn<T,S,C>>: Column<T,S> {
   val unsigned: Boolean
   val zerofill: Boolean
   val displayLength: Int
 }
 
+interface NumericColumn<T:Any, S: NumericColumnType<T, S>>: INumericColumn<T,S, NumericColumn<T,S>>
 
-interface CharColumn<T:Any, S: BaseColumnType<T, S>>: Column<T, S> {
+interface CharColumn<T:Any, S: ICharColumnType<T, S>>: Column<T, S> {
   val charset: String?
   val collation: String?
   val binary: Boolean
 }
 
 
-interface LengthCharColumn<T:Any, S: BaseColumnType<T, S>>: CharColumn<T, S>, LengthColumn<T, S>
+interface LengthCharColumn<T:Any, S: ILengthCharColumnType<T, S>>: CharColumn<T, S>, LengthColumn<T, S>
 
 
-interface DecimalColumn<T:Any, S: BaseColumnType<T, S>>: NumericColumn<T, S> {
+interface DecimalColumn<T:Any, S: DecimalColumnType<T, S>>: INumericColumn<T, S, DecimalColumn<T,S>> {
   val precision:Int
   val scale:Int
 }
 
 
-interface LengthColumn<T:Any, S: BaseColumnType<T, S>>: Column<T, S> {
+interface LengthColumn<T:Any, S: ILengthColumnType<T, S>>: Column<T, S> {
   val length:Int
 }
 
