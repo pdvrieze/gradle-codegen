@@ -30,36 +30,11 @@ import uk.ac.bournemouth.kotlinsql.AbstractColumnConfiguration.AbstractCharColum
 
 internal val LINE_SEPARATOR: String by lazy { System.getProperty("line.separator")!! }
 
-internal interface AllColumns<T:Any, S: BaseColumnType<T,S>>: DecimalColumn<T,S>, LengthCharColumn<T,S>
 /**
  * Implementation for the database API
  */
 
-fun <T:Any, S: BaseColumnType<T, S>, C:Column<T,S>>ColumnImpl(configuration: AbstractColumnConfiguration<T, S, C>): ColumnImpl<T,S,C> {
-// These helper functions are needed as the generic type inference is not quite complete
-  fun <T:Any, S:BaseColumnType<T,S>, C: Column<T,S>> numberHelper(configuration: AbstractNumberColumnConfiguration<T,S,*>): ColumnImpl<T,S,C> {
-    return when(configuration) {
-      is NumberColumnConfiguration     -> ColumnImpl(configuration.name, configuration)
-      is DecimalColumnConfiguration    -> ColumnImpl(configuration.name, configuration)
-    }
-  }
-
-  fun <T:Any, S:BaseColumnType<T,S>, C: Column<T,S>> charHelper(configuration: AbstractCharColumnConfiguration<T,S,*>): ColumnImpl<T,S,C> {
-    return when(configuration) {
-      is CharColumnConfiguration     -> ColumnImpl(configuration.name, configuration)
-      is LengthCharColumnConfiguration    -> ColumnImpl(configuration.name, configuration)
-    }
-  }
-
-  return when (configuration) {
-    is NormalColumnConfiguration     -> ColumnImpl(configuration.name, configuration)
-    is AbstractNumberColumnConfiguration -> numberHelper(configuration)
-    is AbstractCharColumnConfiguration -> charHelper(configuration)
-    is LengthColumnConfiguration     -> ColumnImpl(configuration.name, configuration)
-  }
-}
-
-open class ColumnImpl<T:Any, S: BaseColumnType<T, S>, out C:Column<T,S>> private constructor (
+internal abstract class ColumnImpl<T:Any, S: BaseColumnType<T, S>, C:Column<T,S>> internal constructor (
       override val table: TableRef,
       override val type: S,
       override val name: String,
@@ -71,112 +46,16 @@ open class ColumnImpl<T:Any, S: BaseColumnType<T, S>, out C:Column<T,S>> private
       override val columnFormat: AbstractColumnConfiguration.ColumnFormat?,
       override val storageFormat: AbstractColumnConfiguration.StorageFormat?,
       override val references: ColsetRef?,
-      override val unsigned:Boolean = false,
-      override val zerofill: Boolean = false,
-      override val displayLength: Int = -1,
-      override val precision: Int = -1,
-      override val scale:Int = -1,
-      override val charset:String? = null,
-      override val collation:String? = null,
-      override val binary:Boolean = false,
-      override val length:Int = -1
-) : AllColumns<T, S> {
-  constructor(name:String, configuration: NormalColumnConfiguration<T, S>):
-      this(table=configuration.table,
-           type=configuration.type,
-           name=name,
-           notnull=configuration.notnull,
-           unique=configuration.unique,
-           autoincrement=configuration.autoincrement,
-           default=configuration.default,
-           comment=configuration.comment,
-           columnFormat=configuration.columnFormat,
-           storageFormat=configuration.storageFormat,
-           references=configuration.references)
-
-  constructor(name:String, configuration: LengthColumnConfiguration<T, S>):
-  this(table=configuration.table,
-       type=configuration.type,
-       name=name,
-       notnull=configuration.notnull,
-       unique=configuration.unique,
-       autoincrement=configuration.autoincrement,
-       default=configuration.default,
-       comment=configuration.comment,
-       columnFormat=configuration.columnFormat,
-       storageFormat=configuration.storageFormat,
-       references=configuration.references,
-       length = configuration.length)
-
-  constructor(name:String, configuration: NumberColumnConfiguration<T, S>):
-  this(table=configuration.table,
-       type=configuration.type,
-       name=name,
-       notnull=configuration.notnull,
-       unique=configuration.unique,
-       autoincrement=configuration.autoincrement,
-       default=configuration.default,
-       comment=configuration.comment,
-       columnFormat=configuration.columnFormat,
-       storageFormat=configuration.storageFormat,
-       references=configuration.references,
-       unsigned=configuration.unsigned,
-       zerofill=configuration.zerofill,
-       displayLength=configuration.displayLength)
-
-
-  constructor(name:String, configuration: CharColumnConfiguration<T, S>):
-  this(table=configuration.table,
-       type=configuration.type,
-       name=name,
-       notnull=configuration.notnull,
-       unique=configuration.unique,
-       autoincrement=configuration.autoincrement,
-       default=configuration.default,
-       comment=configuration.comment,
-       columnFormat=configuration.columnFormat,
-       storageFormat=configuration.storageFormat,
-       references=configuration.references,
-       binary=configuration.binary,
-       charset=configuration.charset,
-       collation=configuration.collation)
-
-
-  constructor(name:String, configuration: LengthCharColumnConfiguration<T, S>):
-  this(table=configuration.table,
-       type=configuration.type,
-       name=name,
-       notnull=configuration.notnull,
-       unique=configuration.unique,
-       autoincrement=configuration.autoincrement,
-       default=configuration.default,
-       comment=configuration.comment,
-       columnFormat=configuration.columnFormat,
-       storageFormat=configuration.storageFormat,
-       references=configuration.references,
-       length=configuration.length,
-       binary=configuration.binary,
-       charset=configuration.charset,
-       collation=configuration.collation)
-
-
-  constructor(name:String, configuration: DecimalColumnConfiguration<T, S>):
-  this(table=configuration.table,
-       type=configuration.type,
-       name=configuration.name,
-       notnull=configuration.notnull,
-       unique=configuration.unique,
-       autoincrement=configuration.autoincrement,
-       default=configuration.default,
-       comment=configuration.comment,
-       columnFormat=configuration.columnFormat,
-       storageFormat=configuration.storageFormat,
-       references=configuration.references,
-       unsigned=configuration.unsigned,
-       zerofill=configuration.zerofill,
-       displayLength=configuration.displayLength,
-       precision = configuration.precision,
-       scale = configuration.scale)
+      val unsigned:Boolean = false,
+      val zerofill: Boolean = false,
+      val displayLength: Int = -1,
+      val precision: Int = -1,
+      val scale:Int = -1,
+      val charset:String? = null,
+      val collation:String? = null,
+      val binary:Boolean = false,
+      val length:Int = -1
+):Column<T,S> {
 
 
   @Suppress("UNCHECKED_CAST")
@@ -212,11 +91,118 @@ open class ColumnImpl<T:Any, S: BaseColumnType<T, S>, out C:Column<T,S>> private
 
     return result
   }
-
-  override fun copyConfiguration(owner: Table): AbstractColumnConfiguration<T, S, Column<T, S>> {
-    return type.newConfiguration(owner, this)
-  }
 }
+
+internal class NormalColumnImpl<T:Any, S: SimpleColumnType<T, S>>(name:String, configuration: NormalColumnConfiguration<T, S>):
+      ColumnImpl<T, S, SimpleColumn<T, S>> (table = configuration.table,
+                                            type = configuration.type,
+                                            name = name,
+                                            notnull = configuration.notnull,
+                                            unique = configuration.unique,
+                                            autoincrement = configuration.autoincrement,
+                                            default = configuration.default,
+                                            comment = configuration.comment,
+                                            columnFormat = configuration.columnFormat,
+                                            storageFormat = configuration.storageFormat,
+                                            references = configuration.references), SimpleColumn<T, S> {
+  override fun copyConfiguration(newName:String?, owner: Table) = NormalColumnConfiguration(owner, newName ?: name, type)
+}
+
+internal class LengthColumnImpl<T:Any, S: LengthColumnType<T, S>>(name:String, configuration: LengthColumnConfiguration<T, S>):
+      ColumnImpl<T,S, LengthColumn<T,S>>(table=configuration.table,
+                                         type=configuration.type,
+                                         name=name,
+                                         notnull=configuration.notnull,
+                                         unique=configuration.unique,
+                                         autoincrement=configuration.autoincrement,
+                                         default=configuration.default,
+                                         comment=configuration.comment,
+                                         columnFormat=configuration.columnFormat,
+                                         storageFormat=configuration.storageFormat,
+                                         references=configuration.references,
+                                         length = configuration.length), LengthColumn<T,S> {
+  override fun copyConfiguration(newName:String?, owner: Table) = LengthColumnConfiguration(owner, newName ?: name, type, length)
+}
+
+internal class NumberColumnImpl<T:Any, S: NumericColumnType<T, S>>(name:String, configuration: NumberColumnConfiguration<T, S>):
+      ColumnImpl<T, S, NumericColumn<T, S>> (table = configuration.table,
+                                             type = configuration.type,
+                                             name = name,
+                                             notnull = configuration.notnull,
+                                             unique = configuration.unique,
+                                             autoincrement = configuration.autoincrement,
+                                             default = configuration.default,
+                                             comment = configuration.comment,
+                                             columnFormat = configuration.columnFormat,
+                                             storageFormat = configuration.storageFormat,
+                                             references = configuration.references,
+                                             unsigned = configuration.unsigned,
+                                             zerofill = configuration.zerofill,
+                                             displayLength = configuration.displayLength), NumericColumn<T, S> {
+  override fun copyConfiguration(newName:String?, owner: Table) = NumberColumnConfiguration(owner, newName ?: name, type)
+}
+
+
+internal class CharColumnImpl<T:Any, S: CharColumnType<T, S>>(name:String, configuration: CharColumnConfiguration<T, S>):
+      ColumnImpl<T, S, CharColumn<T, S>> (table = configuration.table,
+                                          type = configuration.type,
+                                          name = name,
+                                          notnull = configuration.notnull,
+                                          unique = configuration.unique,
+                                          autoincrement = configuration.autoincrement,
+                                          default = configuration.default,
+                                          comment = configuration.comment,
+                                          columnFormat = configuration.columnFormat,
+                                          storageFormat = configuration.storageFormat,
+                                          references = configuration.references,
+                                          binary = configuration.binary,
+                                          charset = configuration.charset,
+                                          collation = configuration.collation), CharColumn<T, S> {
+  override fun copyConfiguration(newName:String?, owner: Table) = CharColumnConfiguration(owner, newName ?: name, type)
+}
+
+
+internal class LengthCharColumnImpl<T:Any, S: LengthCharColumnType<T, S>>(name:String, configuration: LengthCharColumnConfiguration<T, S>):
+      ColumnImpl<T, S, LengthCharColumn<T, S>> (table = configuration.table,
+                                                type = configuration.type,
+                                                name = name,
+                                                notnull = configuration.notnull,
+                                                unique = configuration.unique,
+                                                autoincrement = configuration.autoincrement,
+                                                default = configuration.default,
+                                                comment = configuration.comment,
+                                                columnFormat = configuration.columnFormat,
+                                                storageFormat = configuration.storageFormat,
+                                                references = configuration.references,
+                                                length = configuration.length,
+                                                binary = configuration.binary,
+                                                charset = configuration.charset,
+                                                collation = configuration.collation), LengthCharColumn<T, S> {
+  override fun copyConfiguration(newName:String?, owner: Table) = LengthCharColumnConfiguration(owner, newName ?: name, type, length)
+}
+
+
+internal class DecimalColumnImpl<T:Any, S: DecimalColumnType<T, S>>(name:String, configuration: DecimalColumnConfiguration<T, S>):
+      ColumnImpl<T, S, DecimalColumn<T, S>> (table = configuration.table,
+                                             type = configuration.type,
+                                             name = configuration.name,
+                                             notnull = configuration.notnull,
+                                             unique = configuration.unique,
+                                             autoincrement = configuration.autoincrement,
+                                             default = configuration.default,
+                                             comment = configuration.comment,
+                                             columnFormat = configuration.columnFormat,
+                                             storageFormat = configuration.storageFormat,
+                                             references = configuration.references,
+                                             unsigned = configuration.unsigned,
+                                             zerofill = configuration.zerofill,
+                                             displayLength = configuration.displayLength,
+                                             precision = configuration.precision,
+                                             scale = configuration.scale), DecimalColumn<T,S> {
+  override fun copyConfiguration(newName:String?, owner: Table) = DecimalColumnConfiguration(owner, newName ?: name, type, precision, scale)
+}
+
+
 
 class TableRefImpl(override val _name: String) : TableRef {}
 
@@ -244,7 +230,7 @@ abstract class AbstractTable: Table {
     return column(property.name) as Column<T, S>
   }
 
-  open protected class TypeFieldAccessor<T:Any, S: BaseColumnType<T, S>, C:Column<T,S>>(val type: BaseColumnType<T, S>): Table.FieldAccessor<T, S, C> {
+  open protected class TypeFieldAccessor<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(val type: BaseColumnType<T, S>): Table.FieldAccessor<T, S, C> {
     private var value: C? = null
     open fun name(property: kotlin.reflect.KProperty<*>) = property.name
     override operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): C {
@@ -257,11 +243,11 @@ abstract class AbstractTable: Table {
   }
 
   /** Property delegator to access database columns by name and type. */
-  protected fun <T:Any, S: BaseColumnType<T, S>, C: Column<T,S>> name(name:String, type: BaseColumnType<T, S>) = NamedFieldAccessor<T,S,C>(
+  protected fun <T:Any, S: ColumnType<T, S, C>, C: Column<T,S>> name(name:String, type: BaseColumnType<T, S>) = NamedFieldAccessor<T,S,C>(
         name,
         type)
 
-  final protected class NamedFieldAccessor<T:Any, S: BaseColumnType<T, S>, C:Column<T,S>>(val name:String, type: BaseColumnType<T, S>): TypeFieldAccessor<T, S, C>(type) {
+  final protected class NamedFieldAccessor<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(val name:String, type: BaseColumnType<T, S>): TypeFieldAccessor<T, S, C>(type) {
     override fun name(property: kotlin.reflect.KProperty<*>): String = this.name
   }
 

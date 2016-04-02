@@ -136,7 +136,7 @@ interface BaseColumnType<T:Any, S: BaseColumnType<T, S>> {
   fun cast(column: Column<*, *>): Column<T, S>
   fun cast(value: Any): T
 
-  fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T,S, out Column<T,S>>
+  fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T,S, out Column<T,S>, out Any>
 }
 
 sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override val typeName:String, override val type: KClass<T>):BaseColumnType<T,S> {
@@ -167,9 +167,9 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
     object FLOAT_T     : NumericColumnType<Float, FLOAT_T>("FLOAT", Float::class)
     object DOUBLE_T    : NumericColumnType<Double, DOUBLE_T>("DOUBLE", Double::class)
 
-    override fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T, S, NumericColumn<T, S>> {
-      return NumberColumnConfiguration<T,S>(owner, refColumn.name, this as S)
-    }
+    override fun newConfiguration(owner: Table, refColumn: Column<T,S>)=
+          NumberColumnConfiguration(owner, refColumn.name, this as S)
+
   }
 
   sealed class DecimalColumnType<T:Any, S:DecimalColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, DecimalColumn<T,S>>(typeName, type), INumericColumnType<T,S, DecimalColumn<T,S>> {
@@ -177,9 +177,9 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
     object DECIMAL_T   : DecimalColumnType<BigDecimal, DECIMAL_T>("DECIMAL", BigDecimal::class)
     object NUMERIC_T   : DecimalColumnType<BigDecimal, NUMERIC_T>("NUMERIC", BigDecimal::class)
 
-    override fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T, S, DecimalColumn<T, S>> {
+    override fun newConfiguration(owner: Table, refColumn: Column<T,S>):DecimalColumnConfiguration<T,S> {
       refColumn as DecimalColumn<T,S>
-      return DecimalColumnConfiguration<T,S>(owner, refColumn.name, this as S, refColumn.precision, refColumn.scale)
+      return DecimalColumnConfiguration(owner, refColumn.name, this as S, refColumn.precision, refColumn.scale)
     }
   }
 
@@ -198,43 +198,42 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
     object MEDIUMBLOB_T: SimpleColumnType<ByteArray, MEDIUMBLOB_T>("MEDIUMBLOB", ByteArray::class), BoundedType { override val maxLen = 0xffffff }
     object LONGBLOB_T  : SimpleColumnType<ByteArray, LONGBLOB_T>("LONGBLOB", ByteArray::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
 
-    override fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T, S, Column<T, S>> {
-      return NormalColumnConfiguration<T,S>(owner, refColumn.name, this as S)
-    }
+    override fun newConfiguration(owner: Table, refColumn: Column<T,S>) =
+          NormalColumnConfiguration(owner, refColumn.name, this as S)
 
   }
 
-  interface ICharColumnType<T:Any, S:ICharColumnType<T,S>>: BaseColumnType<T,S>
+  interface ICharColumnType<T:Any, S:ICharColumnType<T,S, C>, C:ICharColumn<T,S, C>>: BaseColumnType<T,S>
 
-  sealed class CharColumnType<T:Any, S:CharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, CharColumn<T,S>>(typeName, type), ICharColumnType<T,S> {
+  sealed class CharColumnType<T:Any, S:CharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, CharColumn<T,S>>(typeName, type), ICharColumnType<T,S, CharColumn<T,S>> {
 
     object TINYTEXT_T  : CharColumnType<String, TINYTEXT_T>("TINYTEXT", String::class), BoundedType { override val maxLen = 255 }
     object TEXT_T      : CharColumnType<String, TEXT_T>("TEXT", String::class), BoundedType { override val maxLen = 0xffff }
     object MEDIUMTEXT_T: CharColumnType<String, MEDIUMTEXT_T>("MEDIUMTEXT", String::class), BoundedType { override val maxLen = 0xffffff }
     object LONGTEXT_T  : CharColumnType<String, LONGTEXT_T>("LONGTEXT", String::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
 
-    override fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T, S, Column<T, S>> {
-      return CharColumnConfiguration<T,S>(owner, refColumn.name, this as S)
-    }
+    override fun newConfiguration(owner: Table, refColumn: Column<T,S>) =
+          CharColumnConfiguration<T,S>(owner, refColumn.name, this as S)
 
   }
 
-  interface ILengthColumnType<T:Any, S:ILengthColumnType<T,S>>: BaseColumnType<T,S>
+  interface ILengthColumnType<T:Any, S:ILengthColumnType<T,S, C>, C:ILengthColumn<T,S,C>>: BaseColumnType<T,S>
 
-  sealed class LengthColumnType<T:Any, S:LengthColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthColumn<T,S>>(typeName, type), ILengthColumnType<T,S> {
+  sealed class LengthColumnType<T:Any, S:LengthColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthColumn<T,S>>(typeName, type), ILengthColumnType<T,S, LengthColumn<T,S>> {
 
     object BITFIELD_T  : LengthColumnType<Array<Boolean>, BITFIELD_T>("BIT", Array<Boolean>::class)
 
     object BINARY_T    : LengthColumnType<ByteArray, BINARY_T>("BINARY", ByteArray::class), BoundedType { override val maxLen = 255 }
     object VARBINARY_T : LengthColumnType<ByteArray, VARBINARY_T>("VARBINARY", ByteArray::class), BoundedType { override val maxLen = 0xffff }
 
-    override fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T, S, Column<T, S>> {
-      return LengthColumnConfiguration<T,S>(owner, refColumn.name, this as S, (refColumn as LengthColumn).length)
-    }
+    override fun newConfiguration(owner: Table, refColumn: Column<T,S>) =
+          LengthColumnConfiguration(owner, refColumn.name, this as S, (refColumn as LengthColumn).length)
 
   }
 
-  interface ILengthCharColumnType<T:Any, S:ILengthCharColumnType<T,S>>:ICharColumnType<T,S>, ILengthColumnType<T,S>
+  interface ILengthCharColumnType<T:Any, S:LengthCharColumnType<T,S>>:
+        ICharColumnType<T,S, LengthCharColumn<T,S>>,
+        ILengthColumnType<T,S, LengthCharColumn<T,S>>
 
 
   sealed class LengthCharColumnType<T:Any, S:LengthCharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthCharColumn<T,S>>(typeName, type), ILengthCharColumnType<T,S> {
@@ -242,9 +241,8 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
     object CHAR_T      : LengthCharColumnType<String, CHAR_T>("CHAR", String::class), BoundedType { override val maxLen = 255 }
     object VARCHAR_T   : LengthCharColumnType<String, VARCHAR_T>("VARCHAR", String::class), BoundedType { override val maxLen = 0xffff }
 
-    override fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T, S, Column<T, S>> {
-      return LengthCharColumnConfiguration<T,S>(owner, refColumn.name, this as S, (refColumn as LengthCharColumn).length)
-    }
+    override fun newConfiguration(owner: Table, refColumn: Column<T,S>) =
+          LengthCharColumnConfiguration(owner, refColumn.name, this as S, (refColumn as LengthCharColumn).length)
 
   }
 
@@ -272,11 +270,11 @@ interface Column<T:Any, S: BaseColumnType<T, S>>: ColumnRef<T,S> {
 
   fun toDDL(): CharSequence
 
-  fun copyConfiguration(owner: Table): AbstractColumnConfiguration<T,S,Column<T,S>>
+  fun copyConfiguration(newName:String? = null, owner: Table): AbstractColumnConfiguration<T,S,Column<T,S>, Any>
 }
 
 interface SimpleColumn<T:Any, S: SimpleColumnType<T, S>>: Column<T,S> {
-
+  override fun copyConfiguration(newName:String?, owner: Table): NormalColumnConfiguration<T,S>
 }
 
 
@@ -286,26 +284,39 @@ interface INumericColumn<T:Any, S: INumericColumnType<T, S, C>,C:INumericColumn<
   val displayLength: Int
 }
 
-interface NumericColumn<T:Any, S: NumericColumnType<T, S>>: INumericColumn<T,S, NumericColumn<T,S>>
+interface NumericColumn<T:Any, S: NumericColumnType<T, S>>: INumericColumn<T,S, NumericColumn<T,S>> {
+  override fun copyConfiguration(newName:String?, owner: Table): NumberColumnConfiguration<T,S>
+}
 
-interface CharColumn<T:Any, S: ICharColumnType<T, S>>: Column<T, S> {
+interface ICharColumn<T:Any, S: ICharColumnType<T, S, C>, C:ICharColumn<T,S,C>>: Column<T, S> {
   val charset: String?
   val collation: String?
   val binary: Boolean
+
 }
 
+interface CharColumn<T:Any, S: CharColumnType<T, S>>: ICharColumn<T, S, CharColumn<T,S>> {
+  override fun copyConfiguration(newName:String?, owner: Table): CharColumnConfiguration<T,S>
+}
 
-interface LengthCharColumn<T:Any, S: ILengthCharColumnType<T, S>>: CharColumn<T, S>, LengthColumn<T, S>
+interface LengthCharColumn<T:Any, S: LengthCharColumnType<T, S>>: ICharColumn<T, S, LengthCharColumn<T,S>>, ILengthColumn<T, S, LengthCharColumn<T,S>> {
+  override fun copyConfiguration(newName:String?, owner: Table): LengthCharColumnConfiguration<T,S>
+}
 
 
 interface DecimalColumn<T:Any, S: DecimalColumnType<T, S>>: INumericColumn<T, S, DecimalColumn<T,S>> {
   val precision:Int
   val scale:Int
+  override fun copyConfiguration(newName:String?, owner: Table): DecimalColumnConfiguration<T,S>
 }
 
 
-interface LengthColumn<T:Any, S: ILengthColumnType<T, S>>: Column<T, S> {
+interface ILengthColumn<T:Any, S: ILengthColumnType<T, S, C>, C: ILengthColumn<T,S,C>>: Column<T, S> {
   val length:Int
+}
+
+interface LengthColumn<T:Any, S:LengthColumnType<T,S>>: ILengthColumn<T,S, LengthColumn<T,S>> {
+  override fun copyConfiguration(newName:String?, owner: Table): LengthColumnConfiguration<T,S>
 }
 
 class ForeignKey constructor(private val fromCols:List<ColumnRef<*,*>>, private val toTable:TableRef, private val toCols:List<ColumnRef<*,*>>) {
@@ -329,9 +340,8 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
   val uniqueKeys = mutableListOf<List<ColumnRef<*,*>>>()
   val indices = mutableListOf<List<ColumnRef<*,*>>>()
 
-  inline fun <T :Any, S: BaseColumnType<T,S>, C:Column<T,S>, CONF_T : AbstractColumnConfiguration<T, S, C>> CONF_T.add(block: CONF_T.() ->Unit):ColumnRef<T,S> {
-    // The casting to C is necessary to make stuff compile
-    return (ColumnImpl(this.apply(block)) as C).let { it -> cols.add(it); it.ref() }
+  inline fun <T :Any, S: BaseColumnType<T,S>, C:Column<T,S>, CONF_T : AbstractColumnConfiguration<T, S, C, CONF_T>> CONF_T.add(block: CONF_T.() ->Unit):ColumnRef<T,S> {
+    return apply(block).newColumn().let { it -> cols.add(it); it.ref() }
   }
 
   // @formatter:off
@@ -360,14 +370,14 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
   fun BLOB(name: String, block: NormalColumnConfiguration<ByteArray, BLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, BLOB_T).add( block)
   fun MEDIUMBLOB(name: String, block: NormalColumnConfiguration<ByteArray, MEDIUMBLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, MEDIUMBLOB_T).add( block)
   fun LONGBLOB(name: String, block: NormalColumnConfiguration<ByteArray, LONGBLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, LONGBLOB_T).add( block)
-  fun TINYTEXT(name: String, block: AbstractCharColumnConfiguration<String, TINYTEXT_T, CharColumn<String, TINYTEXT_T>>.() -> Unit) = CharColumnConfiguration( this, name, TINYTEXT_T).add( block)
-  fun TEXT(name: String, block: AbstractCharColumnConfiguration<String, TEXT_T, CharColumn<String, TEXT_T>>.() -> Unit) = CharColumnConfiguration( this, name, TEXT_T).add( block)
-  fun MEDIUMTEXT(name: String, block: AbstractCharColumnConfiguration<String, MEDIUMTEXT_T, CharColumn<String, MEDIUMTEXT_T>>.() -> Unit) = CharColumnConfiguration( this, name, MEDIUMTEXT_T).add( block)
-  fun LONGTEXT(name: String, block: AbstractCharColumnConfiguration<String, LONGTEXT_T, CharColumn<String, LONGTEXT_T>>.() -> Unit) = CharColumnConfiguration( this, name, LONGTEXT_T).add( block)
+  fun TINYTEXT(name: String, block: CharColumnConfiguration<String, TINYTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, TINYTEXT_T).add( block)
+  fun TEXT(name: String, block: CharColumnConfiguration<String, TEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, TEXT_T).add( block)
+  fun MEDIUMTEXT(name: String, block: CharColumnConfiguration<String, MEDIUMTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, MEDIUMTEXT_T).add( block)
+  fun LONGTEXT(name: String, block: CharColumnConfiguration<String, LONGTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, LONGTEXT_T).add( block)
 
   /* Versions without configuration closure */
   fun BIT(name: String) = NormalColumnConfiguration(this, name, BIT_T).add({})
-  fun BIT(name:String, length:Int) = NormalColumnConfiguration(this, name, BITFIELD_T).add({})
+  fun BIT(name:String, length:Int) = LengthColumnConfiguration(this, name, BITFIELD_T, length).add({})
   fun TINYINT(name: String) = NumberColumnConfiguration(this, name, TINYINT_T).add({})
   fun SMALLINT(name:String) = NumberColumnConfiguration(this, name, SMALLINT_T).add({})
   fun MEDIUMINT(name:String) = NumberColumnConfiguration(this, name, MEDIUMINT_T).add({})
@@ -495,7 +505,7 @@ interface Table:TableRef {
   fun ref(): TableRef
   fun resolve(ref: ColumnRef<*, *>): Column<*, *>
 
-  interface FieldAccessor<T:Any, S: BaseColumnType<T,S>, C:Column<T,S>> {
+  interface FieldAccessor<T:Any, S: ColumnType<T,S,C>, C:Column<T,S>> {
     operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): C
   }
 
@@ -550,7 +560,7 @@ abstract class ImmutableTable private constructor(override val _name: String,
   constructor(name:String, extra: String? = null, block: TableConfiguration.()->Unit): this(
         TableConfiguration(name, extra).apply(block)  )
 
-  protected fun <T:Any, S: BaseColumnType<T, S>, C:Column<T,S>> type(type: BaseColumnType<T, S>) = TypeFieldAccessor<T, S, C>(
+  protected fun <T:Any, S: ColumnType<T, S, C>, C:Column<T,S>> type(type: ColumnType<T, S, C>) = TypeFieldAccessor<T, S, C>(
         type)
 
 }
