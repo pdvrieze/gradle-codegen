@@ -64,7 +64,7 @@ import uk.ac.bournemouth.kotlinsql.AbstractColumnConfiguration.AbstractCharColum
  */
 @Suppress("NOTHING_TO_INLINE")
 abstract class MutableTable constructor(override val _name: String,
-                                                override val _extra: String?) : AbstractTable() {
+                                                override val _extra: String? = null) : AbstractTable() {
 
   override val _cols: List<Column<*, *>> = mutableListOf()
   
@@ -85,7 +85,9 @@ abstract class MutableTable constructor(override val _name: String,
     get() { doInit; return __indices }
 
   // Using lazy takes the pain out of on-demand initialisation
-  private val doInit by lazy { init() }
+  private val doInit by lazy {
+    init()
+  }
 
   abstract fun init()
 
