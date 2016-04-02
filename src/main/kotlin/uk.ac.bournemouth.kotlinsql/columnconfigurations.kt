@@ -86,6 +86,10 @@ sealed abstract class AbstractColumnConfiguration<T:Any, S: BaseColumnType<T, S>
     final class LengthCharColumnConfiguration<T:Any, S: BaseColumnType<T, S>>(table: TableRef, name: String, type: S, override val length: Int): AbstractCharColumnConfiguration<T, S, LengthCharColumn<T, S>>(table, name, type), BaseLengthColumnConfiguration<T, S, LengthCharColumn<T, S>>
   }
 
+  interface BaseLengthColumnConfiguration<T:Any, S: BaseColumnType<T,S>, C:LengthColumn<T,S>> {
+    val length:Int
+  }
+
   final class LengthColumnConfiguration<T:Any, S: BaseColumnType<T, S>>(table: TableRef, name: String, type: S, override val length: Int): AbstractColumnConfiguration<T, S, LengthColumn<T, S>>(table, name, type), BaseLengthColumnConfiguration<T, S, LengthColumn<T, S>>
 }
 

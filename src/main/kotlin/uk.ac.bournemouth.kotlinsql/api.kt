@@ -292,10 +292,6 @@ interface LengthColumn<T:Any, S: BaseColumnType<T, S>>: Column<T, S> {
   val length:Int
 }
 
-interface BaseLengthColumnConfiguration<T:Any, S: BaseColumnType<T,S>, C:LengthColumn<T,S>> {
-  val length:Int
-}
-
 class ForeignKey constructor(private val fromCols:List<ColumnRef<*,*>>, private val toTable:TableRef, private val toCols:List<ColumnRef<*,*>>) {
   internal fun toDDL(): CharSequence {
     val transform: (ColumnRef<*,*>) -> CharSequence = { it.name }
