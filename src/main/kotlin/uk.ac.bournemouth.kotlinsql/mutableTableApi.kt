@@ -95,221 +95,69 @@ abstract class MutableTable constructor(override val _name: String,
     return (ColumnImpl(apply(block)) as C).apply { (_cols as MutableList<Column<*,*>>).add(this)}.let{ name(name, it.type)}
   }
 
-  protected inline fun BIT(name:String, block: NormalColumnConfiguration<Boolean, BIT_T>.() -> Unit) = NormalColumnConfiguration(
-        this,
-        name,
-        BIT_T).add(block)
-  protected inline fun BIT(name:String, length:Int, block: BaseLengthColumnConfiguration<Array<Boolean>, BITFIELD_T, LengthColumn<Array<Boolean>, BITFIELD_T>>.() -> Unit) = LengthColumnConfiguration(
-        this,
-        name,
-        BITFIELD_T,
-        length).add(block)
-  protected inline fun TINYINT(name:String, block: NumberColumnConfiguration<Byte, TINYINT_T>.() -> Unit) = NumberColumnConfiguration(
-        this,
-        name,
-        TINYINT_T).add(block)
-  protected inline fun SMALLINT(name:String, block: NumberColumnConfiguration<Short, SMALLINT_T>.() -> Unit) = NumberColumnConfiguration(
-        this,
-        name,
-        SMALLINT_T).add(block)
-  protected inline fun MEDIUMINT(name:String, block: NumberColumnConfiguration<Int, MEDIUMINT_T>.() -> Unit) = NumberColumnConfiguration(
-        this,
-        name,
-        MEDIUMINT_T).add(block)
-  protected inline fun INT(name:String, block: NumberColumnConfiguration<Int, INT_T>.() -> Unit) = NumberColumnConfiguration(
-        this,
-        name,
-        INT_T).add(block)
-  protected inline fun BIGINT(name:String, block: NumberColumnConfiguration<Long, BIGINT_T>.() -> Unit) = NumberColumnConfiguration(
-        this,
-        name,
-        BIGINT_T).add(block)
-  protected inline fun FLOAT(name:String, block: NumberColumnConfiguration<Float, FLOAT_T>.() -> Unit) = NumberColumnConfiguration(
-        this,
-        name,
-        FLOAT_T).add(block)
-  protected inline fun DOUBLE(name:String, block: NumberColumnConfiguration<Double, DOUBLE_T>.() -> Unit) = NumberColumnConfiguration(
-        this,
-        name,
-        DOUBLE_T).add(block)
-  protected inline fun DECIMAL(name:String, precision:Int=-1, scale:Int=-1, block: DecimalColumnConfiguration<BigDecimal, DECIMAL_T>.() -> Unit) = DecimalColumnConfiguration(
-        this,
-        name,
-        DECIMAL_T,
-        precision,
-        scale).add(block)
-  protected inline fun NUMERIC(name:String, precision:Int=-1, scale:Int=-1, block: DecimalColumnConfiguration<BigDecimal, NUMERIC_T>.() -> Unit) = DecimalColumnConfiguration(
-        this,
-        name,
-        NUMERIC_T,
-        precision,
-        scale).add(block)
-  protected inline fun DATE(name:String, block: NormalColumnConfiguration<Date, DATE_T>.() -> Unit) = NormalColumnConfiguration(
-        this,
-        name,
-        DATE_T).add(block)
-  protected inline fun TIME(name:String, block: NormalColumnConfiguration<Time, TIME_T>.() -> Unit) = NormalColumnConfiguration(
-        this,
-        name,
-        TIME_T).add(block)
-  protected inline fun TIMESTAMP(name:String, block: NormalColumnConfiguration<Timestamp, TIMESTAMP_T>.() -> Unit) = NormalColumnConfiguration(
-        this,
-        name,
-        TIMESTAMP_T).add(block)
-  protected inline fun DATETIME(name:String, block: NormalColumnConfiguration<Timestamp, DATETIME_T>.() -> Unit) = NormalColumnConfiguration(
-        this,
-        name,
-        DATETIME_T).add(block)
-  protected inline fun YEAR(name:String, block: NormalColumnConfiguration<Date, YEAR_T>.() -> Unit) = NormalColumnConfiguration(
-        this,
-        name,
-        YEAR_T).add(block)
-  protected inline fun CHAR(name:String, length:Int = -1, block: LengthCharColumnConfiguration<String, CHAR_T>.() -> Unit) = LengthCharColumnConfiguration(
-        this,
-        name,
-        CHAR_T,
-        length).add(block)
-  protected inline fun VARCHAR(name:String, length:Int, block: LengthCharColumnConfiguration<String, VARCHAR_T>.() -> Unit) = LengthCharColumnConfiguration(
-        this,
-        name,
-        VARCHAR_T,
-        length).add(block)
-  protected inline fun BINARY(name:String, length:Int, block: BaseLengthColumnConfiguration<ByteArray, BINARY_T, LengthColumn<ByteArray, BINARY_T>>.() -> Unit) = LengthColumnConfiguration(
-        this,
-        name,
-        BINARY_T,
-        length).add(block)
-  protected inline fun VARBINARY(name:String, length:Int, block: BaseLengthColumnConfiguration<ByteArray, VARBINARY_T, LengthColumn<ByteArray, VARBINARY_T>>.() -> Unit) = LengthColumnConfiguration(
-        this,
-        name,
-        VARBINARY_T,
-        length).add(block)
-  protected inline fun TINYBLOB(name:String, block: NormalColumnConfiguration<ByteArray, TINYBLOB_T>.() -> Unit) = NormalColumnConfiguration(
-        this,
-        name,
-        TINYBLOB_T).add(block)
-  protected inline fun BLOB(name:String, block: NormalColumnConfiguration<ByteArray, BLOB_T>.() -> Unit) = NormalColumnConfiguration(
-        this,
-        name,
-        BLOB_T).add(block)
-  protected inline fun MEDIUMBLOB(name:String, block: NormalColumnConfiguration<ByteArray, MEDIUMBLOB_T>.() -> Unit) = NormalColumnConfiguration(
-        this,
-        name,
-        MEDIUMBLOB_T).add(block)
-  protected inline fun LONGBLOB(name:String, block: NormalColumnConfiguration<ByteArray, LONGBLOB_T>.() -> Unit) = NormalColumnConfiguration(
-        this,
-        name,
-        LONGBLOB_T).add(block)
-  protected inline fun TINYTEXT(name:String, block: CharColumnConfiguration<String, TINYTEXT_T>.() -> Unit) = CharColumnConfiguration(
-        this,
-        name,
-        TINYTEXT_T).add(block)
-  protected inline fun TEXT(name:String, block: CharColumnConfiguration<String, TEXT_T>.() -> Unit) = CharColumnConfiguration(
-        this,
-        name,
-        TEXT_T).add(block)
-  protected inline fun MEDIUMTEXT(name:String, block: CharColumnConfiguration<String, MEDIUMTEXT_T>.() -> Unit) = CharColumnConfiguration(
-        this,
-        name,
-        MEDIUMTEXT_T).add(block)
-  protected inline fun LONGTEXT(name:String, block: CharColumnConfiguration<String, LONGTEXT_T>.() -> Unit) = CharColumnConfiguration(
-        this,
-        name,
-        LONGTEXT_T).add(block)
+  // @formatter:off
+  protected fun BIT(name:String, block: NormalColumnConfiguration<Boolean, BIT_T>.() -> Unit) = NormalColumnConfiguration( this, name, BIT_T).add( block)
+  protected fun BIT(name: String, length: Int, block: BaseLengthColumnConfiguration<Array<Boolean>, BITFIELD_T, LengthColumn<Array<Boolean>, BITFIELD_T>>.() -> Unit) = LengthColumnConfiguration( this, name, BITFIELD_T, length).add( block)
+  protected fun TINYINT(name: String, block: NumberColumnConfiguration<Byte, TINYINT_T>.() -> Unit) = NumberColumnConfiguration( this, name, TINYINT_T).add( block)
+  protected fun SMALLINT(name: String, block: NumberColumnConfiguration<Short, SMALLINT_T>.() -> Unit) = NumberColumnConfiguration( this, name, SMALLINT_T).add( block)
+  protected fun MEDIUMINT(name: String, block: NumberColumnConfiguration<Int, MEDIUMINT_T>.() -> Unit) = NumberColumnConfiguration( this, name, MEDIUMINT_T).add( block)
+  protected fun INT(name: String, block: NumberColumnConfiguration<Int, INT_T>.() -> Unit) = NumberColumnConfiguration( this, name, INT_T).add( block)
+  protected fun BIGINT(name: String, block: NumberColumnConfiguration<Long, BIGINT_T>.() -> Unit) = NumberColumnConfiguration( this, name, BIGINT_T).add( block)
+  protected fun FLOAT(name: String, block: NumberColumnConfiguration<Float, FLOAT_T>.() -> Unit) = NumberColumnConfiguration( this, name, FLOAT_T).add( block)
+  protected fun DOUBLE(name: String, block: NumberColumnConfiguration<Double, DOUBLE_T>.() -> Unit) = NumberColumnConfiguration( this, name, DOUBLE_T).add( block)
+  protected fun DECIMAL(name: String, precision: Int = -1, scale: Int = -1, block: DecimalColumnConfiguration<BigDecimal, DECIMAL_T>.() -> Unit) = DecimalColumnConfiguration( this, name, DECIMAL_T, precision, scale).add( block)
+  protected fun NUMERIC(name: String, precision: Int = -1, scale: Int = -1, block: DecimalColumnConfiguration<BigDecimal, NUMERIC_T>.() -> Unit) = DecimalColumnConfiguration( this, name, NUMERIC_T, precision, scale).add( block)
+  protected fun DATE(name: String, block: NormalColumnConfiguration<Date, DATE_T>.() -> Unit) = NormalColumnConfiguration( this, name, DATE_T).add( block)
+  protected fun TIME(name: String, block: NormalColumnConfiguration<Time, TIME_T>.() -> Unit) = NormalColumnConfiguration( this, name, TIME_T).add( block)
+  protected fun TIMESTAMP(name: String, block: NormalColumnConfiguration<Timestamp, TIMESTAMP_T>.() -> Unit) = NormalColumnConfiguration( this, name, TIMESTAMP_T).add( block)
+  protected fun DATETIME(name: String, block: NormalColumnConfiguration<Timestamp, DATETIME_T>.() -> Unit) = NormalColumnConfiguration( this, name, DATETIME_T).add( block)
+  protected fun YEAR(name: String, block: NormalColumnConfiguration<Date, YEAR_T>.() -> Unit) = NormalColumnConfiguration( this, name, YEAR_T).add( block)
+  protected fun CHAR(name: String, length: Int = -1, block: LengthCharColumnConfiguration<String, CHAR_T>.() -> Unit) = LengthCharColumnConfiguration( this, name, CHAR_T, length).add( block)
+  protected fun VARCHAR(name: String, length: Int, block: LengthCharColumnConfiguration<String, VARCHAR_T>.() -> Unit) = LengthCharColumnConfiguration( this, name, VARCHAR_T, length).add( block)
+  protected fun BINARY(name: String, length: Int, block: BaseLengthColumnConfiguration<ByteArray, BINARY_T, LengthColumn<ByteArray, BINARY_T>>.() -> Unit) = LengthColumnConfiguration( this, name, BINARY_T, length).add( block)
+  protected fun VARBINARY(name: String, length: Int, block: BaseLengthColumnConfiguration<ByteArray, VARBINARY_T, LengthColumn<ByteArray, VARBINARY_T>>.() -> Unit) = LengthColumnConfiguration( this, name, VARBINARY_T, length).add( block)
+  protected fun TINYBLOB(name: String, block: NormalColumnConfiguration<ByteArray, TINYBLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, TINYBLOB_T).add( block)
+  protected fun BLOB(name: String, block: NormalColumnConfiguration<ByteArray, BLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, BLOB_T).add( block)
+  protected fun MEDIUMBLOB(name: String, block: NormalColumnConfiguration<ByteArray, MEDIUMBLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, MEDIUMBLOB_T).add( block)
+  protected fun LONGBLOB(name: String, block: NormalColumnConfiguration<ByteArray, LONGBLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, LONGBLOB_T).add( block)
+  protected fun TINYTEXT(name: String, block: CharColumnConfiguration<String, TINYTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, TINYTEXT_T).add( block)
+  protected fun TEXT(name: String, block: CharColumnConfiguration<String, TEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, TEXT_T).add( block)
+  protected fun MEDIUMTEXT(name: String, block: CharColumnConfiguration<String, MEDIUMTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, MEDIUMTEXT_T).add( block)
+  protected fun LONGTEXT(name: String, block: CharColumnConfiguration<String, LONGTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, LONGTEXT_T).add( block)
 
   /* Versions without configuration closure */
-  protected inline fun BIT(name:String) = NormalColumnConfiguration(this, name, BIT_T).add({})
-  protected inline fun BIT(name:String, length:Int) = NormalColumnConfiguration(this,
-                                                                                                            name,
-                                                                                                            BITFIELD_T).add({})
-  protected inline fun TINYINT(name:String) = NumberColumnConfiguration(this,
-                                                                                                    name,
-                                                                                                    TINYINT_T).add({})
-  protected inline fun SMALLINT(name:String) = NumberColumnConfiguration(this,
-                                                                                                     name,
-                                                                                                     SMALLINT_T).add({})
-  protected inline fun MEDIUMINT(name:String) = NumberColumnConfiguration(this,
-                                                                                                      name,
-                                                                                                      MEDIUMINT_T).add({})
-  protected inline fun INT(name:String) = NumberColumnConfiguration(this, name, INT_T).add({})
-  protected inline fun BIGINT(name:String) = NumberColumnConfiguration(this,
-                                                                                                   name,
-                                                                                                   BIGINT_T).add({})
-  protected inline fun FLOAT(name:String) = NumberColumnConfiguration(this,
-                                                                                                  name,
-                                                                                                  FLOAT_T).add({})
-  protected inline fun DOUBLE(name:String) = NumberColumnConfiguration(this,
-                                                                                                   name,
-                                                                                                   DOUBLE_T).add({})
-  protected inline fun DECIMAL(name:String, precision:Int=-1, scale:Int=-1) = DecimalColumnConfiguration(
-        this,
-        name,
-        DECIMAL_T,
-        precision,
-        scale).add({})
-  protected inline fun NUMERIC(name:String, precision:Int=-1, scale:Int=-1) = DecimalColumnConfiguration(
-        this,
-        name,
-        NUMERIC_T,
-        precision,
-        scale).add({})
-  protected inline fun DATE(name:String) = NormalColumnConfiguration(this,
-                                                                                                 name,
-                                                                                                 DATE_T).add({})
-  protected inline fun TIME(name:String) = NormalColumnConfiguration(this,
-                                                                                                 name,
-                                                                                                 TIME_T).add({})
-  protected inline fun TIMESTAMP(name:String) = NormalColumnConfiguration(this,
-                                                                                                      name,
-                                                                                                      TIMESTAMP_T).add({})
-  protected inline fun DATETIME(name:String) = NormalColumnConfiguration(this,
-                                                                                                     name,
-                                                                                                     DATETIME_T).add({})
-  protected inline fun YEAR(name:String) = NormalColumnConfiguration(this,
-                                                                                                 name,
-                                                                                                 YEAR_T).add({})
-  protected inline fun CHAR(name:String, length:Int = -1) = LengthCharColumnConfiguration(
-        this,
-        name,
-        CHAR_T,
-        length).add({})
-  protected inline fun VARCHAR(name:String, length:Int) = LengthCharColumnConfiguration(this,
-                                                                                                                    name,
-                                                                                                                    VARCHAR_T,
-                                                                                                                    length).add({})
-  protected inline fun BINARY(name:String, length:Int) = LengthColumnConfiguration(this,
-                                                                                                               name,
-                                                                                                               BINARY_T,
-                                                                                                               length).add({})
-  protected inline fun VARBINARY(name:String, length:Int) = LengthColumnConfiguration(this,
-                                                                                                                  name,
-                                                                                                                  VARBINARY_T,
-                                                                                                                  length).add({})
-  protected inline fun TINYBLOB(name:String) = NormalColumnConfiguration(this,
-                                                                                                     name,
-                                                                                                     TINYBLOB_T).add({})
-  protected inline fun BLOB(name:String) = NormalColumnConfiguration(this,
-                                                                                                 name,
-                                                                                                 BLOB_T).add({})
-  protected inline fun MEDIUMBLOB(name:String) = NormalColumnConfiguration(this,
-                                                                                                       name,
-                                                                                                       MEDIUMBLOB_T).add({})
-  protected inline fun LONGBLOB(name:String) = NormalColumnConfiguration(this,
-                                                                                                     name,
-                                                                                                     LONGBLOB_T).add({})
-  protected inline fun TINYTEXT(name:String) = CharColumnConfiguration(this,
-                                                                                                   name,
-                                                                                                   TINYTEXT_T).add({})
-  protected inline fun TEXT(name:String) = CharColumnConfiguration(this, name, TEXT_T).add({})
-  protected inline fun MEDIUMTEXT(name:String) = CharColumnConfiguration(this,
-                                                                                                     name,
-                                                                                                     MEDIUMTEXT_T).add({})
-  protected inline fun LONGTEXT(name:String) = CharColumnConfiguration(this,
-                                                                                                   name,
-                                                                                                   LONGTEXT_T).add({})
+  protected fun BIT(name: String) = NormalColumnConfiguration(this, name, BIT_T).add({})
+  protected fun BIT(name:String, length:Int) = NormalColumnConfiguration(this, name, BITFIELD_T).add({})
+  protected fun TINYINT(name: String) = NumberColumnConfiguration(this, name, TINYINT_T).add({})
+  protected fun SMALLINT(name: String) = NumberColumnConfiguration(this, name, SMALLINT_T).add({})
+  protected fun MEDIUMINT(name: String) = NumberColumnConfiguration(this, name, MEDIUMINT_T).add({})
+  protected fun INT(name: String) = NumberColumnConfiguration(this, name, INT_T).add({})
+  protected fun BIGINT(name:String) = NumberColumnConfiguration(this, name, BIGINT_T).add({})
+  protected fun FLOAT(name: String) = NumberColumnConfiguration(this, name, FLOAT_T).add({})
+  protected fun DOUBLE(name: String) = NumberColumnConfiguration(this, name, DOUBLE_T).add({})
+  protected fun DECIMAL(name: String, precision:Int=-1, scale:Int=-1) = DecimalColumnConfiguration(this, name, DECIMAL_T, precision, scale).add({})
+  protected fun NUMERIC(name: String, precision: Int = -1, scale: Int = -1) = DecimalColumnConfiguration(this, name, NUMERIC_T, precision, scale).add({})
+  protected fun DATE(name: String) = NormalColumnConfiguration(this, name, DATE_T).add({})
+  protected fun TIME(name: String) = NormalColumnConfiguration(this, name, TIME_T).add({})
+  protected fun TIMESTAMP(name: String) = NormalColumnConfiguration(this, name, TIMESTAMP_T).add({})
+  protected fun DATETIME(name: String) = NormalColumnConfiguration(this, name, DATETIME_T).add({})
+  protected fun YEAR(name: String) = NormalColumnConfiguration(this, name, YEAR_T).add({})
+  protected fun CHAR(name: String, length: Int = -1) = LengthCharColumnConfiguration(this, name, CHAR_T, length).add({})
+  protected fun VARCHAR(name: String, length: Int) = LengthCharColumnConfiguration(this, name, VARCHAR_T, length).add({})
+
+  protected fun BINARY(name: String, length: Int) = LengthColumnConfiguration(this, name, BINARY_T, length).add({})
+  protected fun VARBINARY(name: String, length: Int) = LengthColumnConfiguration(this, name, VARBINARY_T, length).add({})
+  protected fun TINYBLOB(name: String) = NormalColumnConfiguration(this, name, TINYBLOB_T).add({})
+  protected fun BLOB(name: String) = NormalColumnConfiguration(this, name, BLOB_T).add({})
+  protected fun MEDIUMBLOB(name: String) = NormalColumnConfiguration(this, name, MEDIUMBLOB_T).add({})
+  protected fun LONGBLOB(name: String) = NormalColumnConfiguration(this, name, LONGBLOB_T).add({})
+  protected fun TINYTEXT(name: String) = CharColumnConfiguration(this, name, TINYTEXT_T).add({})
+  protected fun TEXT(name: String) = CharColumnConfiguration(this, name, TEXT_T).add({})
+  protected fun MEDIUMTEXT(name:String) = CharColumnConfiguration(this, name, MEDIUMTEXT_T).add({})
+  protected fun LONGTEXT(name: String) = CharColumnConfiguration(this, name, LONGTEXT_T).add({})
 
 
-  protected fun INDEX(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { __indices.add(mutableListOf(resolve(col1)).apply { addAll(resolve(cols)) })}
+  protected fun INDEX(col1: ColumnRef<*, *>, vararg cols: ColumnRef<*,*>) { __indices.add(mutableListOf(resolve(col1)).apply { addAll(resolve(cols)) })}
   protected fun UNIQUE(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { __uniqueKeys.add(mutableListOf(resolve(col1)).apply { addAll(resolve(cols)) })}
   protected fun PRIMARY_KEY(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { __primaryKey = mutableListOf(resolve(col1)).apply { addAll(resolve(cols)) }}
 
@@ -369,4 +217,5 @@ abstract class MutableTable constructor(override val _name: String,
         __FOREIGN_KEY__1(this, col1)
 
 
+  // @formatter:on
 }
