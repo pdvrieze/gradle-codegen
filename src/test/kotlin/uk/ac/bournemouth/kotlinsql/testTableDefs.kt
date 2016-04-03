@@ -20,10 +20,8 @@
 
 package uk.ac.bournemouth.kotlinsql
 
+import org.testng.Assert.assertEquals
 import org.testng.annotations.Test
-import kotlin.reflect.KProperty
-import org.testng.Assert
-import org.testng.Assert.*
 
 /**
  * Created by pdvrieze on 02/04/16.
@@ -45,7 +43,7 @@ class testTableDefs {
 
   @Test
   fun testMakeSQL() {
-    val db = object: MutableTable("TestMakeSQL", null) {
+    val table = object: MutableTable("TestMakeSQL", null) {
       val index by INT("index") { AUTO_INCREMENT }
       val name by VARCHAR("name", 20)
 
@@ -54,8 +52,34 @@ class testTableDefs {
       }
     }
 
-    val statement = db.SELECT(db.name).WHERE { db.index eq 1 }
+    val statement = table.SELECT(table.name).WHERE { table.index eq 1 }
     assertEquals(statement.toSQL(), "SELECT `name` FROM `TestMakeSQL` WHERE `index` = ?")
+
+  }
+
+  @Test
+  fun testMakeSQL2() {
+    val persons = object: MutableTable("persons", null) {
+      val index by INT("index") { AUTO_INCREMENT }
+      val name by VARCHAR("name", 20)
+
+      override fun init() {
+        PRIMARY_KEY(index)
+      }
+    }
+
+    val emails = object: MutableTable("emails", null) {
+      val index by reference(persons.index) { AUTO_INCREMENT }
+      val emailaddr by VARCHAR("email", 50)
+
+      override fun init() {
+        PRIMARY_KEY(index, emailaddr)
+        FOREIGN_KEY(index).REFERENCES(persons.index)
+      }
+    }
+
+    val statement = persons.SELECT(persons.name, emails.emailaddr).WHERE { persons.index eq emails.index }
+    assertEquals(statement.toSQL(), "SELECT `name` FROM `persons` as p WHERE `index` = ?")
 
   }
 

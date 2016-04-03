@@ -56,59 +56,11 @@ interface Table:TableRef {
 
   fun appendDDL(appendable: Appendable)
 
-  abstract  class WhereClause {
+  fun <T:Any, S:ColumnType<T,S,C>, C: Column<T, S,C>> SELECT(col1: C)= Database.SELECT(col1)
 
-    abstract fun setParameters(statementHelper: StatementHelper, first:Int=1):Int
-
-    abstract fun toSQL(): String
-  }
-
-  private class EqWhereClause<T:Any>(val ref:ColumnRef<T,*,*>,val value: T?):WhereClause() {
-    override fun toSQL(): String {
-      return "`${ref.name}` = ?"
-    }
-
-    override fun setParameters(statementHelper: StatementHelper, first: Int):Int {
-      statementHelper.setParam_(first, value)
-      return first+1
-    }
-  }
-
-  class _Where {
-
-    //    @JvmStatic
-    infix fun <T : Any> ColumnRef<T, *, *>.eq(value: T): WhereClause = EqWhereClause(this, value)
-  }
-
-  interface Statement<T:Any, S:IColumnType<T,S,C>, C:Column<T,S,C>> {
-    val select:Select
-
-    fun toSQL(): String
-  }
-
-  class _Statement1<T:Any, S:IColumnType<T,S,C>, C:Column<T,S,C>>(override val select:_Select1<T,S,C>, val where:WhereClause):Statement<T,S,C> {
-    override fun toSQL(): String {
-      return "${select.toSQL()} WHERE ${where.toSQL()}"
-    }
-  }
-
-  interface Select {
-    fun toSQL(): String
-  }
-
-  class _Select1<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>>(val col1:C1):Select {
-
-    fun WHERE(config: _Where.() -> WhereClause):_Statement1<T1,S1, C1> {
-      return _Statement1(this, _Where().config())
-    }
-
-    override fun toSQL(): String {
-      return "SELECT `${col1.name}` FROM `${col1.table._name}`"
-    }
-  }
-
-
-  fun <T:Any, S:ColumnType<T,S,C>, C: Column<T, S,C>> SELECT(col1: C)= _Select1(col1)
+  fun <T1 :Any, S1 :ColumnType<T1, S1, C1>, C1 : Column<T1, S1, C1>,
+       T2 :Any, S2 :ColumnType<T2, S2, C2>, C2 : Column<T2, S2, C2>
+        > SELECT(col1: C1, col2: C2)= Database.SELECT(col1, col2)
 
 }
 
