@@ -20,6 +20,7 @@
 
 package uk.ac.bournemouth.util.kotlin.sql
 
+import java.math.BigDecimal
 import java.sql.*
 import java.util.*
 import java.util.concurrent.Executor
@@ -56,13 +57,15 @@ class StatementHelper constructor(val statement: PreparedStatement) : PreparedSt
     }
 
 
-  inline fun <reified T> setParam_(index: Int, value: T) = when (value) {
+  fun <T> setParam_(index: Int, value: T) = when (value) {
     is Int -> setParam(index, value)
     is Long -> setParam(index, value)
     is String -> setParam(index, value)
     is Boolean -> setParam(index, value)
     is Byte -> setParam(index, value)
     is Short -> setParam(index, value)
+    is BigDecimal -> setBigDecimal(index, value)
+    is ByteArray -> statement.setBytes(index,value)
     else -> throw UnsupportedOperationException("Not possible to set this value")
   }
 

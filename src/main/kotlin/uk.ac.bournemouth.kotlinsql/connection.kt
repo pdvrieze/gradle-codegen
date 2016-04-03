@@ -20,10 +20,7 @@
 
 package uk.ac.bournemouth.util.kotlin.sql
 
-import uk.ac.bournemouth.kotlinsql.IColumnType
-import uk.ac.bournemouth.kotlinsql.Column
-import uk.ac.bournemouth.kotlinsql.ColumnType
-import uk.ac.bournemouth.kotlinsql.Database
+import uk.ac.bournemouth.kotlinsql.*
 import java.sql.*
 import java.util.*
 import java.util.concurrent.Executor
@@ -462,15 +459,8 @@ class DBConnection constructor(private val connection: Connection, val db: Datab
   fun getNetworkTimeout(): Int = connection.networkTimeout
 
 
-  class _Select1<T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>>(val col1:C1) {
-
-  }
-
-
-  fun <T:Any, S:ColumnType<T,S,C>, C: Column<T, S,C>> SELECT(col1: C)= _Select1(col1)
-
-
 }
+
 
 fun String.appendWarnings(warnings: Iterator<SQLWarning>): String {
   val result = StringBuilder().append(this).append(" - \n    ")

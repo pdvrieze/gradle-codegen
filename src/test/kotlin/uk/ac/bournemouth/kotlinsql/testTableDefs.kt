@@ -22,6 +22,8 @@ package uk.ac.bournemouth.kotlinsql
 
 import org.testng.annotations.Test
 import kotlin.reflect.KProperty
+import org.testng.Assert
+import org.testng.Assert.*
 
 /**
  * Created by pdvrieze on 02/04/16.
@@ -41,35 +43,20 @@ class testTableDefs {
     }
   }
 
-  class SimpleDelegate() {
-
-    init {
-      System.out.println("Creating delegate object")
-    }
-
-    operator fun getValue(thisref:Any, property:KProperty<*>): String {
-      return "bar"
-    }
-    operator fun setValue(thisref:Any, property:KProperty<*>, value:String) {
-      System.out.println("Attempting to set value ${value}")
-    }
-  }
-
   @Test
-  fun testDelegate() {
+  fun testMakeSQL() {
+    val db = object: MutableTable("TestMakeSQL", null) {
+      val index by INT("index") { AUTO_INCREMENT }
+      val name by VARCHAR("name", 20)
 
-
-
-    val test = object {
-
-      val simpleDelegate:SimpleDelegate get() {
-        System.out.println("Initializing a delegate by function")
-        return SimpleDelegate()
+      override fun init() {
+        PRIMARY_KEY(index)
       }
-
-      val bar by SimpleDelegate()
-      val baz by simpleDelegate
     }
+
+    val statement = db.SELECT(db.name).WHERE { db.index eq 1 }
+    assertEquals(statement.toSQL(), "SELECT `name` FROM `TestMakeSQL` WHERE `index` = ?")
+
   }
 
 }
