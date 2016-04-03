@@ -34,7 +34,7 @@ internal val LINE_SEPARATOR: String by lazy { System.getProperty("line.separator
  * Implementation for the database API
  */
 
-internal abstract class ColumnImpl<T:Any, S: BaseColumnType<T, S>, C:Column<T,S>> internal constructor (
+internal abstract class ColumnImpl<T:Any, S: ColumnType<T, S,C>, C:Column<T,S,C>> internal constructor (
       override val table: TableRef,
       override val type: S,
       override val name: String,
@@ -55,7 +55,7 @@ internal abstract class ColumnImpl<T:Any, S: BaseColumnType<T, S>, C:Column<T,S>
       val collation:String? = null,
       val binary:Boolean = false,
       val length:Int = -1
-):Column<T,S> {
+):Column<T,S,C> {
 
 
   @Suppress("UNCHECKED_CAST")
@@ -185,7 +185,7 @@ internal class LengthCharColumnImpl<T:Any, S: LengthCharColumnType<T, S>>(name:S
 internal class DecimalColumnImpl<T:Any, S: DecimalColumnType<T, S>>(name:String, configuration: DecimalColumnConfiguration<T, S>):
       ColumnImpl<T, S, DecimalColumn<T, S>> (table = configuration.table,
                                              type = configuration.type,
-                                             name = configuration.name,
+                                             name = name,
                                              notnull = configuration.notnull,
                                              unique = configuration.unique,
                                              autoincrement = configuration.autoincrement,
@@ -211,43 +211,45 @@ abstract class AbstractTable: Table {
 
   companion object {
 
-    fun List<Column<*, *>>.resolve(ref: ColumnRef<*,*>) = find { it.name == ref.name } ?: throw java.util.NoSuchElementException(
+    fun List<Column<*,*,*>>.resolve(ref: ColumnRef<*,*,*>) = find { it.name == ref.name } ?: throw java.util.NoSuchElementException(
           "No column with the name ${ref.name} could be found")
 
-    fun List<Column<*, *>>.resolve(refs: List<ColumnRef<*,*>>) = refs.map { resolve(it) }
+    fun List<Column<*,*,*>>.resolveAll(refs: List<ColumnRef<*,*,*>>) = refs.map { resolve(it) }
 
-    fun List<Column<*, *>>.resolve(refs: Array<out ColumnRef<*,*>>) = refs.map { resolve(it) }
+    fun List<Column<*,*,*>>.resolveAll(refs: Array<out ColumnRef<*,*,*>>) = refs.map { resolve(it) }
+
+    fun List<Column<*,*,*>>.resolveAll(refs: Sequence<ColumnRef<*,*,*>>) = refs.map { resolve(it) }
 
   }
 
-  override fun resolve(ref: ColumnRef<*,*>) : Column<*, *> = (_cols.find {it.name==ref.name}) !!
+  override fun resolve(ref: ColumnRef<*,*,*>) : Column<*,*,*> = (_cols.find {it.name==ref.name}) !!
 
   override fun ref(): TableRef = TableRefImpl(_name)
 
   override fun column(name:String) = _cols.firstOrNull {it.name==name}
 
-  operator fun <T:Any, S: BaseColumnType<T, S>> getValue(thisRef: ImmutableTable, property: KProperty<*>): Column<T, S> {
-    return column(property.name) as Column<T, S>
+  operator fun getValue(thisRef: ImmutableTable, property: KProperty<*>): Column<*,*,*> {
+    return column(property.name)!!
   }
 
-  open protected class TypeFieldAccessor<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(val type: BaseColumnType<T, S>): Table.FieldAccessor<T, S, C> {
+  open protected class TypeFieldAccessor<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(val type: ColumnType<T, S, C>): Table.FieldAccessor<T, S, C> {
     private var value: C? = null
     open fun name(property: kotlin.reflect.KProperty<*>) = property.name
     override operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): C {
       if (value==null) {
         val field = thisRef.column(property.name) ?: throw IllegalArgumentException("There is no field with the given name ${property.name}")
-        value = type.cast(field) as C
+        value = type.cast(field)
       }
       return value!!
     }
   }
 
   /** Property delegator to access database columns by name and type. */
-  protected fun <T:Any, S: ColumnType<T, S, C>, C: Column<T,S>> name(name:String, type: BaseColumnType<T, S>) = NamedFieldAccessor<T,S,C>(
+  protected fun <T:Any, S: ColumnType<T, S, C>, C: Column<T,S,C>> name(name:String, type: ColumnType<T, S,C>) = NamedFieldAccessor<T,S,C>(
         name,
         type)
 
-  final protected class NamedFieldAccessor<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(val name:String, type: BaseColumnType<T, S>): TypeFieldAccessor<T, S, C>(type) {
+  final protected class NamedFieldAccessor<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(val name:String, type: ColumnType<T, S, C>): TypeFieldAccessor<T, S, C>(type) {
     override fun name(property: kotlin.reflect.KProperty<*>): String = this.name
   }
 
@@ -268,6 +270,6 @@ abstract class AbstractTable: Table {
 }
 
 
-internal fun toDDL(first:CharSequence, cols: List<ColumnRef<*,*>>):CharSequence {
+internal fun toDDL(first:CharSequence, cols: List<ColumnRef<*,*,*>>):CharSequence {
   return StringBuilder(first).append(" (`").apply { cols.joinTo(this, "`, `", transform = {it.name}) }.append("`)")
 }

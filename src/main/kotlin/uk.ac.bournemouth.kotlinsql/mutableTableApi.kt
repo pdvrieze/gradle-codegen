@@ -78,22 +78,22 @@ abstract class MutableTable private constructor(name: String?,
 
   override val _name:String = if (name==null) javaClass.simpleName else name
 
-  override val _cols: List<Column<*, *>> = mutableListOf()
+  override val _cols: List<Column<*,*,*>> = mutableListOf()
   
-  private var __primaryKey: List<Column<*,*>>? = null
-  override val _primaryKey: List<Column<*, *>>?
+  private var __primaryKey: List<Column<*,*,*>>? = null
+  override val _primaryKey: List<Column<*,*,*>>?
     get() { doInit; return __primaryKey }
   
   private val __foreignKeys = mutableListOf<ForeignKey>()
   override val _foreignKeys: List<ForeignKey>
     get() { doInit; return __foreignKeys }
 
-  private val __uniqueKeys= mutableListOf<List<Column<*,*>>>()
-  override val _uniqueKeys: List<List<Column<*, *>>>
+  private val __uniqueKeys= mutableListOf<List<Column<*,*,*>>>()
+  override val _uniqueKeys: List<List<Column<*,*,*>>>
     get() { doInit; return __uniqueKeys }
 
-  private val __indices = mutableListOf<List<Column<*,*>>>()
-  override val _indices: List<List<Column<*, *>>>
+  private val __indices = mutableListOf<List<Column<*,*,*>>>()
+  override val _indices: List<List<Column<*,*,*>>>
     get() { doInit; return __indices }
 
   // Using lazy takes the pain out of on-demand initialisation
@@ -104,12 +104,12 @@ abstract class MutableTable private constructor(name: String?,
   abstract fun init()
 
 
-  private inline fun <T :Any, S: ColumnType<T,S,C>, C :Column<T, S>>
+  private inline fun <T :Any, S: ColumnType<T,S,C>, C :Column<T,S,C>>
         add(column:C): Table.FieldAccessor<T,S, C> {
-    return column.apply { (_cols as MutableList<Column<*,*>>).add(this)}.let{ name(column.name, it.type) }
+    return column.apply { (_cols as MutableList<Column<*,*,*>>).add(this)}.let{ name(column.name, it.type) }
   }
 
-  private inline fun <T :Any, S: ColumnType<T,S,C>, CONF_T : AbstractColumnConfiguration<T, S, C, CONF_T>, C :Column<T, S>>
+  private inline fun <T :Any, S: ColumnType<T,S,C>, CONF_T : AbstractColumnConfiguration<T, S, C, CONF_T>, C :Column<T,S,C>>
         CONF_T.add(block: CONF_T.() ->Unit): Table.FieldAccessor<T,S, C> {
     // Use the name delegator to prevent access issues.
     return add(apply(block).newColumn())
@@ -177,11 +177,11 @@ abstract class MutableTable private constructor(name: String?,
   protected fun LONGTEXT(name: String) = CharColumnConfiguration(this, name, LONGTEXT_T).add({})
 
   /* When there is no body, the configuration subtype does not matter */
-  protected fun <T:Any, S:ColumnType<T,S,C>, C:Column<T,S>>reference(other: C): Table.FieldAccessor<T,S,C> {
+  protected fun <T:Any, S:ColumnType<T,S,C>, C:Column<T,S,C>>reference(other: C): Table.FieldAccessor<T,S,C> {
     return add(other.copyConfiguration(owner = this).newColumn() as C)
   }
 
-  protected fun <T:Any, S:ColumnType<T,S,C>, C:Column<T,S>>reference(newName:String, other: C): Table.FieldAccessor<T,S,C> {
+  protected fun <T:Any, S:ColumnType<T,S,C>, C:Column<T,S,C>>reference(newName:String, other: C): Table.FieldAccessor<T,S,C> {
     return add(other.copyConfiguration(newName = newName, owner = this).newColumn() as C)
   }
 
@@ -202,63 +202,160 @@ abstract class MutableTable private constructor(name: String?,
   protected fun <T:Any, S:LengthColumnType<T,S>>reference(newName:String, other: LengthColumn<T,S>, block: LengthColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(newName, this).add(block)
   protected fun <T:Any, S:NumericColumnType<T,S>>reference(newName:String, other: NumericColumn<T,S>, block: NumberColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(newName, this).add(block)
 
-  protected fun INDEX(col1: ColumnRef<*, *>, vararg cols: ColumnRef<*,*>) { __indices.add(mutableListOf(resolve(col1)).apply { addAll(resolve(cols)) })}
-  protected fun UNIQUE(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { __uniqueKeys.add(mutableListOf(resolve(col1)).apply { addAll(resolve(cols)) })}
-  protected fun PRIMARY_KEY(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { __primaryKey = mutableListOf(resolve(col1)).apply { addAll(resolve(cols)) }}
+  protected fun <C:Column<*,*,C>> INDEX(col1: ColumnRef<*,*,C>, vararg cols: ColumnRef<*,*,*>) {
+    __indices.add(mutableListOf<Column<*,*,*>>(resolve(col1)).apply {
+        addAll(resolveAll(cols))
+    })
+  }
 
-  class __FOREIGN_KEY__6<T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>, T4:Any, S4: BaseColumnType<T4,S4>, T5:Any, S5: BaseColumnType<T5,S5>, T6:Any, S6: BaseColumnType<T6,S6>>(val table: MutableTable, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>, val col3:ColumnRef<T3, S3>, val col4:ColumnRef<T4, S4>, val col5:ColumnRef<T5, S5>, val col6:ColumnRef<T6, S6>) {
-    fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>, ref3:ColumnRef<T3, S3>, ref4:ColumnRef<T4, S4>, ref5:ColumnRef<T5, S5>, ref6:ColumnRef<T6, S6>) {
+  private fun __resolve(col1:ColumnRef<*,*,*>, vararg cols: ColumnRef<*,*,*>):List<Column<*,*,*>> {
+    val seq: Sequence<ColumnRef<*,*,*>> = sequenceOf(sequenceOf(col1),cols.asSequence()).flatten()
+    return _cols.resolveAll(seq).toList()
+  }
+
+  protected fun <C:Column<*,*,C>> UNIQUE(col1: ColumnRef<*,*,C>, vararg cols: ColumnRef<*,*,*>) { __uniqueKeys.add(__resolve(col1, *cols))}
+  protected fun PRIMARY_KEY(col1: ColumnRef<*,*,*>, vararg cols: ColumnRef<*,*,*>) { __primaryKey = __resolve(col1, *cols)}
+
+  class __FOREIGN_KEY__6<T1:Any, S1: IColumnType<T1,S1, C1>, C1: Column<T1,S1,C1>,
+                         T2:Any, S2: IColumnType<T2,S2, C2>, C2: Column<T2,S2,C2>,
+                         T3:Any, S3: IColumnType<T3,S3, C3>, C3: Column<T3,S3,C3>,
+                         T4:Any, S4: IColumnType<T4,S4, C4>, C4: Column<T4,S4,C4>,
+                         T5:Any, S5: IColumnType<T5,S5, C5>, C5: Column<T5,S5,C5>,
+                         T6:Any, S6: IColumnType<T6,S6, C6>, C6: Column<T6,S6,C6>>(
+        val table: MutableTable,
+        val col1:ColumnRef<T1,S1,C1>,
+        val col2:ColumnRef<T2,S2,C2>,
+        val col3:ColumnRef<T3,S3,C3>,
+        val col4:ColumnRef<T4,S4,C4>,
+        val col5:ColumnRef<T5,S5,C5>,
+        val col6:ColumnRef<T6,S6,C6>) {
+    fun REFERENCES(ref1:ColumnRef<T1,S1,C1>,
+                   ref2:ColumnRef<T2,S2,C2>,
+                   ref3:ColumnRef<T3,S3,C3>,
+                   ref4:ColumnRef<T4,S4,C4>,
+                   ref5:ColumnRef<T5,S5,C5>,
+                   ref6:ColumnRef<T6,S6,C6>) {
       (table.__foreignKeys).add(ForeignKey(listOf(col1, col2, col3, col4, col5, col6), ref1.table, listOf(ref1, ref2, ref3, ref4, ref5, ref6).apply { forEach { require(it.table==ref1.table) } }))
     }
   }
 
-  inline fun <T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>, T4:Any, S4: BaseColumnType<T4,S4>, T5:Any, S5: BaseColumnType<T5,S5>, T6:Any, S6: BaseColumnType<T6,S6>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>, col3:ColumnRef<T3, S3>, col4: ColumnRef<T4, S4>, col5:ColumnRef<T5, S5>, col6:ColumnRef<T6, S6>) =
+  inline fun <T1:Any, S1: IColumnType<T1,S1, C1>, C1: Column<T1,S1,C1>,
+              T2:Any, S2: IColumnType<T2,S2, C2>, C2: Column<T2,S2,C2>,
+              T3:Any, S3: IColumnType<T3,S3, C3>, C3: Column<T3,S3,C3>,
+              T4:Any, S4: IColumnType<T4,S4, C4>, C4: Column<T4,S4,C4>,
+              T5:Any, S5: IColumnType<T5,S5, C5>, C5: Column<T5,S5,C5>,
+              T6:Any, S6: IColumnType<T6,S6, C6>, C6: Column<T6,S6,C6>> FOREIGN_KEY(
+        col1: ColumnRef<T1,S1,C1>,
+        col2:ColumnRef<T2,S2,C2>,
+        col3:ColumnRef<T3,S3,C3>,
+        col4: ColumnRef<T4,S4,C4>,
+        col5:ColumnRef<T5,S5,C5>,
+        col6:ColumnRef<T6,S6,C6>) =
         __FOREIGN_KEY__6(this, col1,col2,col3,col4,col5,col6)
 
 
-  class __FOREIGN_KEY__5<T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>, T4:Any, S4: BaseColumnType<T4,S4>, T5:Any, S5: BaseColumnType<T5,S5>>(val table: MutableTable, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>, val col3:ColumnRef<T3, S3>, val col4:ColumnRef<T4, S4>, val col5:ColumnRef<T5, S5>) {
-    fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>, ref3:ColumnRef<T3, S3>, ref4:ColumnRef<T4, S4>, ref5:ColumnRef<T5, S5>) {
+  class __FOREIGN_KEY__5<T1:Any, S1: IColumnType<T1,S1, C1>, C1: Column<T1,S1,C1>,
+                         T2:Any, S2: IColumnType<T2,S2, C2>, C2: Column<T2,S2,C2>,
+                         T3:Any, S3: IColumnType<T3,S3, C3>, C3: Column<T3,S3,C3>,
+                         T4:Any, S4: IColumnType<T4,S4, C4>, C4: Column<T4,S4,C4>,
+                         T5:Any, S5: IColumnType<T5,S5, C5>, C5: Column<T5,S5,C5>>(
+        val table: MutableTable,
+        val col1:ColumnRef<T1,S1,C1>,
+        val col2:ColumnRef<T2,S2,C2>,
+        val col3:ColumnRef<T3,S3,C3>,
+        val col4:ColumnRef<T4,S4,C4>,
+        val col5:ColumnRef<T5,S5,C5>) {
+    fun REFERENCES(ref1:ColumnRef<T1,S1,C1>,
+                   ref2:ColumnRef<T2,S2,C2>,
+                   ref3:ColumnRef<T3,S3,C3>,
+                   ref4:ColumnRef<T4,S4,C4>,
+                   ref5:ColumnRef<T5,S5,C5>) {
       (table.__foreignKeys).add(ForeignKey(listOf(col1, col2, col3, col4, col5), ref1.table, listOf(ref1, ref2, ref3, ref4, ref5).apply { forEach { require(it.table==ref1.table) } }))
     }
   }
 
-  inline fun <T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>, T4:Any, S4: BaseColumnType<T4,S4>, T5:Any, S5: BaseColumnType<T5,S5>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>, col3:ColumnRef<T3, S3>, col4: ColumnRef<T4, S4>, col5:ColumnRef<T5, S5>) =
+  inline fun <T1:Any, S1: IColumnType<T1,S1, C1>, C1: Column<T1,S1,C1>,
+              T2:Any, S2: IColumnType<T2,S2, C2>, C2: Column<T2,S2,C2>,
+              T3:Any, S3: IColumnType<T3,S3, C3>, C3: Column<T3,S3,C3>,
+              T4:Any, S4: IColumnType<T4,S4, C4>, C4: Column<T4,S4,C4>,
+              T5:Any, S5: IColumnType<T5,S5, C5>, C5: Column<T5,S5,C5>> FOREIGN_KEY(
+        col1:ColumnRef<T1,S1,C1>,
+        col2:ColumnRef<T2,S2,C2>,
+        col3:ColumnRef<T3,S3,C3>,
+        col4:ColumnRef<T4,S4,C4>,
+        col5:ColumnRef<T5,S5,C5>) =
         __FOREIGN_KEY__5(this, col1,col2,col3,col4,col5)
 
-  class __FOREIGN_KEY__4<T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>, T4:Any, S4: BaseColumnType<T4,S4>>(val table: MutableTable, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>, val col3:ColumnRef<T3, S3>, val col4:ColumnRef<T4, S4>) {
-    fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>, ref3:ColumnRef<T3, S3>, ref4:ColumnRef<T4, S4>) {
+  class __FOREIGN_KEY__4<T1:Any, S1: IColumnType<T1,S1, C1>, C1: Column<T1,S1,C1>,
+                         T2:Any, S2: IColumnType<T2,S2, C2>, C2: Column<T2,S2,C2>,
+                         T3:Any, S3: IColumnType<T3,S3, C3>, C3: Column<T3,S3,C3>,
+                         T4:Any, S4: IColumnType<T4,S4, C4>, C4: Column<T4,S4,C4>>(
+        val table: MutableTable,
+        val col1:ColumnRef<T1,S1,C1>,
+        val col2:ColumnRef<T2,S2,C2>,
+        val col3:ColumnRef<T3,S3,C3>,
+        val col4: ColumnRef<T4, S4, C4>) {
+    fun REFERENCES(ref1:ColumnRef<T1,S1,C1>,
+ref2:ColumnRef<T2,S2,C2>,
+ref3:ColumnRef<T3,S3,C3>,
+ref4:ColumnRef<T4,S4,C4>) {
       (table.__foreignKeys).add(ForeignKey(listOf(col1, col2, col3, col4), ref1.table, listOf(ref1, ref2, ref3, ref4)))
     }
   }
 
-  inline fun <T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>, T4:Any, S4: BaseColumnType<T4,S4>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>, col3:ColumnRef<T3, S3>, col4: ColumnRef<T4, S4>) =
+  inline fun <T1:Any, S1: IColumnType<T1,S1, C1>, C1: Column<T1,S1,C1>,
+              T2:Any, S2: IColumnType<T2,S2, C2>, C2: Column<T2,S2,C2>,
+              T3:Any, S3: IColumnType<T3,S3, C3>, C3: Column<T3,S3,C3>,
+              T4:Any, S4: IColumnType<T4,S4, C4>, C4: Column<T4,S4,C4>> FOREIGN_KEY(
+        col1: ColumnRef<T1,S1,C1>,
+        col2: ColumnRef<T2,S2,C2>,
+        col3: ColumnRef<T3,S3,C3>,
+        col4: ColumnRef<T4,S4,C4>) =
         __FOREIGN_KEY__4(this, col1,col2,col3,col4)
 
-  class __FOREIGN_KEY__3<T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>>(val table: MutableTable, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>, val col3:ColumnRef<T3, S3>) {
-    fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>, ref3:ColumnRef<T3, S3>) {
+  class __FOREIGN_KEY__3<T1:Any, S1: IColumnType<T1,S1, C1>, C1: Column<T1,S1,C1>,
+                         T2:Any, S2: IColumnType<T2,S2, C2>, C2: Column<T2,S2,C2>,
+                         T3:Any, S3: IColumnType<T3,S3, C3>, C3: Column<T3,S3,C3>>(
+        val table: MutableTable,
+        val col1: ColumnRef<T1,S1,C1>,
+        val col2: ColumnRef<T2, S2, C2>,
+        val col3: ColumnRef<T3,S3,C3>) {
+    fun REFERENCES(ref1:ColumnRef<T1,S1,C1>,
+                   ref2:ColumnRef<T2,S2,C2>,
+                   ref3:ColumnRef<T3,S3,C3>) {
       (table.__foreignKeys).add(ForeignKey(listOf(col1, col2, col3), ref1.table, listOf(ref1, ref2, ref3).apply { forEach { require(it.table==ref1.table) } }))
     }
   }
 
-  inline fun <T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>, col3:ColumnRef<T3, S3>) =
-        __FOREIGN_KEY__3(this, col1,col2,col3)
+  inline fun <T1:Any, S1: IColumnType<T1,S1, C1>, C1: Column<T1,S1,C1>,
+              T2:Any, S2: IColumnType<T2,S2, C2>, C2: Column<T2,S2,C2>,
+              T3:Any, S3: IColumnType<T3,S3, C3>, C3: Column<T3,S3,C3>> FOREIGN_KEY(
+        col1:ColumnRef<T1,S1,C1>,
+        col2:ColumnRef<T2,S2,C2>,
+        col3:ColumnRef<T3,S3,C3>) = __FOREIGN_KEY__3(this, col1,col2,col3)
 
-  class __FOREIGN_KEY__2<T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>>(val table: MutableTable, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>) {
-    fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>) {
+  class __FOREIGN_KEY__2<T1:Any, S1: IColumnType<T1,S1, C1>, C1: Column<T1,S1,C1>,
+                         T2:Any, S2: IColumnType<T2,S2, C2>, C2: Column<T2,S2,C2>>(
+        val table: MutableTable,
+        val col1:ColumnRef<T1,S1,C1>,
+        val col2:ColumnRef<T2,S2,C2>) {
+    fun REFERENCES(ref1:ColumnRef<T1,S1,C1>,
+                   ref2:ColumnRef<T2,S2,C2>) {
       (table.__foreignKeys).add(ForeignKey(listOf(col1, col2), ref1.table, listOf(ref1, ref2).apply { require(ref2.table==ref1.table) }))
     }
   }
 
-  inline fun <T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>) =
+  inline fun <T1:Any, S1: IColumnType<T1,S1, C1>, C1: Column<T1,S1,C1>,
+              T2:Any, S2: IColumnType<T2,S2, C2>, C2: Column<T2,S2,C2>> FOREIGN_KEY(col1: ColumnRef<T1,S1,C1>, col2:ColumnRef<T2,S2,C2>) =
         __FOREIGN_KEY__2(this, col1,col2)
 
-  class __FOREIGN_KEY__1<T1:Any, S1: BaseColumnType<T1,S1>>(val table: MutableTable, val col1:ColumnRef<T1, S1>) {
-    fun REFERENCES(ref1:ColumnRef<T1, S1>) {
+  class __FOREIGN_KEY__1<T1:Any, S1: IColumnType<T1,S1, C1>, C1: Column<T1,S1,C1>>(val table: MutableTable, val col1:ColumnRef<T1,S1,C1>) {
+    fun REFERENCES(ref1:ColumnRef<T1,S1,C1>) {
       (table.__foreignKeys).add(ForeignKey(listOf(col1), ref1.table, listOf(ref1)))
     }
   }
 
-  inline fun <T1:Any, S1: BaseColumnType<T1,S1>> FOREIGN_KEY(col1: ColumnRef<T1, S1>) =
+  inline fun <T1:Any, S1: IColumnType<T1,S1, C1>, C1: Column<T1,S1,C1>> FOREIGN_KEY(col1: ColumnRef<T1,S1,C1>) =
         __FOREIGN_KEY__1(this, col1)
 
 

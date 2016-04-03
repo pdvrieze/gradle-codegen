@@ -38,6 +38,11 @@ import kotlin.reflect.KProperty
 import uk.ac.bournemouth.kotlinsql.AbstractColumnConfiguration.*
 import uk.ac.bournemouth.kotlinsql.AbstractColumnConfiguration.AbstractNumberColumnConfiguration.*
 import uk.ac.bournemouth.kotlinsql.AbstractColumnConfiguration.AbstractCharColumnConfiguration.*
+import uk.ac.bournemouth.util.kotlin.sql.DBConnection
+import uk.ac.bournemouth.util.kotlin.sql.connection
+import uk.ac.bournemouth.util.kotlin.sql.useHelper
+import java.sql.Connection
+import javax.sql.DataSource
 
 /**
  * This is an abstract class that contains a set of database tables.
@@ -99,6 +104,17 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
     return _tables.find { it._name==key } ?: throw NoSuchElementException("There is no table with the key ${key}")
   }
 
+  inline fun <R> connect(datasource: DataSource, block: DBConnection.()->R): R {
+    datasource.connection(this) { connection ->
+      connection.autoCommit=false
+      try {
+        return connection.block().apply { connection.commit() }
+      } catch (e:Exception) {
+        connection.rollback()
+        throw e
+      }
+    }
+  }
 
 }
 
@@ -113,36 +129,36 @@ interface TableRef {
  *
  * @param table The table the column is a part of
  * @param name The name of the column
- * @param type The [BaseColumnType] of the column.
+ * @param type The [IColumnType] of the column.
  */
-interface ColumnRef<T:Any, S: BaseColumnType<T, S>> {
+interface ColumnRef<T:Any, S: IColumnType<T, S, C>, C:Column<T,S,C>> {
   val table: TableRef
   val name:String
   val type: S
 }
 
-class ColsetRef(val table:TableRef, val columns:List<out ColumnRef<*, *>>) {
-  constructor(table:TableRef, col1: ColumnRef<*, *>, vararg cols:ColumnRef<*, *>): this(table, mutableListOf(col1).apply { addAll(cols) })
+class ColsetRef(val table:TableRef, val columns:List<out ColumnRef<*,*,*>>) {
+  constructor(table:TableRef, col1: ColumnRef<*,*,*>, vararg cols:ColumnRef<*,*,*>): this(table, mutableListOf(col1).apply { addAll(cols) })
 }
 
 interface BoundedType {
   val maxLen:Int
 }
 
-interface BaseColumnType<T:Any, S: BaseColumnType<T, S>> {
+interface IColumnType<T:Any, S: IColumnType<T, S, C>, C:Column<T,S,C>> {
   val typeName:String
   val type: KClass<T>
 
-  fun cast(column: Column<*, *>): Column<T, S>
+  fun cast(column: Column<*,*,*>): Column<T, S, C>
   fun cast(value: Any): T
 
-  fun newConfiguration(owner: Table, refColumn: Column<T,S>): AbstractColumnConfiguration<T,S, out Column<T,S>, out Any>
+  fun newConfiguration(owner: Table, refColumn: C): AbstractColumnConfiguration<T,S, C, out Any>
 }
 
-sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override val typeName:String, override val type: KClass<T>):BaseColumnType<T,S> {
+sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(override val typeName:String, override val type: KClass<T>): IColumnType<T,S,C> {
 
   @Suppress("UNCHECKED_CAST")
-  override fun cast(column: Column<*,*>): C {
+  override fun cast(column: Column<*,*,*>): C {
     if (column.type.typeName == typeName) {
       return column as C
     } else {
@@ -155,7 +171,7 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
   }
 
   // @formatter:off
-  interface INumericColumnType<T:Any, S:INumericColumnType<T,S,C>, C:INumericColumn<T,S,C>>: BaseColumnType<T,S>
+  interface INumericColumnType<T:Any, S:INumericColumnType<T,S,C>, C:INumericColumn<T,S,C>>: IColumnType<T,S,C>
 
   sealed class NumericColumnType<T:Any, S: NumericColumnType<T, S>>(typeName: String, type: KClass<T>):ColumnType<T,S, NumericColumn<T,S>>(typeName, type), INumericColumnType<T,S, NumericColumn<T,S>> {
     object TINYINT_T   : NumericColumnType<Byte, TINYINT_T>("BIGINT", Byte::class)
@@ -167,7 +183,7 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
     object FLOAT_T     : NumericColumnType<Float, FLOAT_T>("FLOAT", Float::class)
     object DOUBLE_T    : NumericColumnType<Double, DOUBLE_T>("DOUBLE", Double::class)
 
-    override fun newConfiguration(owner: Table, refColumn: Column<T,S>)=
+    override fun newConfiguration(owner: Table, refColumn: NumericColumn<T,S>)=
           NumberColumnConfiguration(owner, refColumn.name, this as S)
 
   }
@@ -177,13 +193,13 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
     object DECIMAL_T   : DecimalColumnType<BigDecimal, DECIMAL_T>("DECIMAL", BigDecimal::class)
     object NUMERIC_T   : DecimalColumnType<BigDecimal, NUMERIC_T>("NUMERIC", BigDecimal::class)
 
-    override fun newConfiguration(owner: Table, refColumn: Column<T,S>):DecimalColumnConfiguration<T,S> {
+    override fun newConfiguration(owner: Table, refColumn: DecimalColumn<T,S>):DecimalColumnConfiguration<T,S> {
       refColumn as DecimalColumn<T,S>
       return DecimalColumnConfiguration(owner, refColumn.name, this as S, refColumn.precision, refColumn.scale)
     }
   }
 
-  sealed class SimpleColumnType<T:Any, S:SimpleColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, Column<T,S>>(typeName, type) {
+  sealed class SimpleColumnType<T:Any, S:SimpleColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, SimpleColumn<T,S>>(typeName, type) {
 
     object BIT_T       : SimpleColumnType<Boolean, BIT_T>("BIT", Boolean::class), BoundedType { override val maxLen = 64 }
 
@@ -198,12 +214,12 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
     object MEDIUMBLOB_T: SimpleColumnType<ByteArray, MEDIUMBLOB_T>("MEDIUMBLOB", ByteArray::class), BoundedType { override val maxLen = 0xffffff }
     object LONGBLOB_T  : SimpleColumnType<ByteArray, LONGBLOB_T>("LONGBLOB", ByteArray::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
 
-    override fun newConfiguration(owner: Table, refColumn: Column<T,S>) =
+    override fun newConfiguration(owner: Table, refColumn: SimpleColumn<T,S>) =
           NormalColumnConfiguration(owner, refColumn.name, this as S)
 
   }
 
-  interface ICharColumnType<T:Any, S:ICharColumnType<T,S, C>, C:ICharColumn<T,S, C>>: BaseColumnType<T,S>
+  interface ICharColumnType<T:Any, S:ICharColumnType<T,S, C>, C:ICharColumn<T,S, C>>: IColumnType<T,S,C>
 
   sealed class CharColumnType<T:Any, S:CharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, CharColumn<T,S>>(typeName, type), ICharColumnType<T,S, CharColumn<T,S>> {
 
@@ -212,12 +228,13 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
     object MEDIUMTEXT_T: CharColumnType<String, MEDIUMTEXT_T>("MEDIUMTEXT", String::class), BoundedType { override val maxLen = 0xffffff }
     object LONGTEXT_T  : CharColumnType<String, LONGTEXT_T>("LONGTEXT", String::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
 
-    override fun newConfiguration(owner: Table, refColumn: Column<T,S>) =
-          CharColumnConfiguration<T,S>(owner, refColumn.name, this as S)
+    @Suppress("UNCHECKED_CAST")
+    override fun newConfiguration(owner: Table, refColumn: CharColumn<T,S>) =
+          CharColumnConfiguration(owner, refColumn.name, this as S)
 
   }
 
-  interface ILengthColumnType<T:Any, S:ILengthColumnType<T,S, C>, C:ILengthColumn<T,S,C>>: BaseColumnType<T,S>
+  interface ILengthColumnType<T:Any, S:ILengthColumnType<T,S, C>, C:ILengthColumn<T,S,C>>: IColumnType<T,S,C>
 
   sealed class LengthColumnType<T:Any, S:LengthColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthColumn<T,S>>(typeName, type), ILengthColumnType<T,S, LengthColumn<T,S>> {
 
@@ -226,22 +243,18 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
     object BINARY_T    : LengthColumnType<ByteArray, BINARY_T>("BINARY", ByteArray::class), BoundedType { override val maxLen = 255 }
     object VARBINARY_T : LengthColumnType<ByteArray, VARBINARY_T>("VARBINARY", ByteArray::class), BoundedType { override val maxLen = 0xffff }
 
-    override fun newConfiguration(owner: Table, refColumn: Column<T,S>) =
-          LengthColumnConfiguration(owner, refColumn.name, this as S, (refColumn as LengthColumn).length)
+    @Suppress("UNCHECKED_CAST")
+    override fun newConfiguration(owner: Table, refColumn: LengthColumn<T,S>) =
+          LengthColumnConfiguration(owner, refColumn.name, this as S, refColumn.length)
 
   }
 
-  interface ILengthCharColumnType<T:Any, S:LengthCharColumnType<T,S>>:
-        ICharColumnType<T,S, LengthCharColumn<T,S>>,
-        ILengthColumnType<T,S, LengthCharColumn<T,S>>
-
-
-  sealed class LengthCharColumnType<T:Any, S:LengthCharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthCharColumn<T,S>>(typeName, type), ILengthCharColumnType<T,S> {
+  sealed class LengthCharColumnType<T:Any, S:LengthCharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthCharColumn<T,S>>(typeName, type), ILengthColumnType<T,S,LengthCharColumn<T,S>>, ICharColumnType<T,S,LengthCharColumn<T,S>> {
 
     object CHAR_T      : LengthCharColumnType<String, CHAR_T>("CHAR", String::class), BoundedType { override val maxLen = 255 }
     object VARCHAR_T   : LengthCharColumnType<String, VARCHAR_T>("VARCHAR", String::class), BoundedType { override val maxLen = 0xffff }
 
-    override fun newConfiguration(owner: Table, refColumn: Column<T,S>) =
+    override fun newConfiguration(owner: Table, refColumn: LengthCharColumn<T,S>) =
           LengthCharColumnConfiguration(owner, refColumn.name, this as S, (refColumn as LengthCharColumn).length)
 
   }
@@ -257,8 +270,8 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S>>(override v
 }
 
 
-interface Column<T:Any, S: BaseColumnType<T, S>>: ColumnRef<T,S> {
-  fun ref(): ColumnRef<T,S>
+interface Column<T:Any, S: IColumnType<T, S,C>, C:Column<T,S,C>>: ColumnRef<T,S,C> {
+  fun ref(): ColumnRef<T,S,C>
   val notnull: Boolean?
   val unique: Boolean
   val autoincrement: Boolean
@@ -270,15 +283,16 @@ interface Column<T:Any, S: BaseColumnType<T, S>>: ColumnRef<T,S> {
 
   fun toDDL(): CharSequence
 
-  fun copyConfiguration(newName:String? = null, owner: Table): AbstractColumnConfiguration<T,S,Column<T,S>, Any>
+  fun copyConfiguration(newName:String? = null, owner: Table): AbstractColumnConfiguration<T,S,C, Any>
 }
 
-interface SimpleColumn<T:Any, S: SimpleColumnType<T, S>>: Column<T,S> {
+interface SimpleColumn<T:Any, S: SimpleColumnType<T, S>>: Column<T,S, SimpleColumn<T,S>> {
   override fun copyConfiguration(newName:String?, owner: Table): NormalColumnConfiguration<T,S>
 }
 
+interface Foo<T:Any,S: IColumnType<T,S,C>,C:Column<T,S,C>>: Column<T,S,C>
 
-interface INumericColumn<T:Any, S: INumericColumnType<T, S, C>,C:INumericColumn<T,S,C>>: Column<T,S> {
+interface INumericColumn<T:Any, S: INumericColumnType<T, S, C>,C:INumericColumn<T,S,C>>: Column<T,S,C> {
   val unsigned: Boolean
   val zerofill: Boolean
   val displayLength: Int
@@ -288,7 +302,7 @@ interface NumericColumn<T:Any, S: NumericColumnType<T, S>>: INumericColumn<T,S, 
   override fun copyConfiguration(newName:String?, owner: Table): NumberColumnConfiguration<T,S>
 }
 
-interface ICharColumn<T:Any, S: ICharColumnType<T, S, C>, C:ICharColumn<T,S,C>>: Column<T, S> {
+interface ICharColumn<T:Any, S: ICharColumnType<T, S, C>, C:ICharColumn<T,S,C>>: Column<T, S, C> {
   val charset: String?
   val collation: String?
   val binary: Boolean
@@ -298,6 +312,7 @@ interface ICharColumn<T:Any, S: ICharColumnType<T, S, C>, C:ICharColumn<T,S,C>>:
 interface CharColumn<T:Any, S: CharColumnType<T, S>>: ICharColumn<T, S, CharColumn<T,S>> {
   override fun copyConfiguration(newName:String?, owner: Table): CharColumnConfiguration<T,S>
 }
+
 
 interface LengthCharColumn<T:Any, S: LengthCharColumnType<T, S>>: ICharColumn<T, S, LengthCharColumn<T,S>>, ILengthColumn<T, S, LengthCharColumn<T,S>> {
   override fun copyConfiguration(newName:String?, owner: Table): LengthCharColumnConfiguration<T,S>
@@ -311,7 +326,7 @@ interface DecimalColumn<T:Any, S: DecimalColumnType<T, S>>: INumericColumn<T, S,
 }
 
 
-interface ILengthColumn<T:Any, S: ILengthColumnType<T, S, C>, C: ILengthColumn<T,S,C>>: Column<T, S> {
+interface ILengthColumn<T:Any, S: ILengthColumnType<T, S, C>, C: ILengthColumn<T,S,C>>: Column<T, S, C> {
   val length:Int
 }
 
@@ -319,9 +334,9 @@ interface LengthColumn<T:Any, S:LengthColumnType<T,S>>: ILengthColumn<T,S, Lengt
   override fun copyConfiguration(newName:String?, owner: Table): LengthColumnConfiguration<T,S>
 }
 
-class ForeignKey constructor(private val fromCols:List<ColumnRef<*,*>>, private val toTable:TableRef, private val toCols:List<ColumnRef<*,*>>) {
+class ForeignKey constructor(private val fromCols:List<ColumnRef<*,*,*>>, private val toTable:TableRef, private val toCols:List<ColumnRef<*,*,*>>) {
   internal fun toDDL(): CharSequence {
-    val transform: (ColumnRef<*,*>) -> CharSequence = { it.name }
+    val transform: (ColumnRef<*,*,*>) -> CharSequence = { it.name }
     val result = fromCols.joinTo(StringBuilder(), "`, `", "FOREIGN KEY (`", "`) REFERENCES ", transform = transform)
     result.append(toTable._name)
     return toCols.joinTo(result, "`, `", "`)", transform = transform)
@@ -334,14 +349,16 @@ class ForeignKey constructor(private val fromCols:List<ColumnRef<*,*>>, private 
 @Suppress("NOTHING_TO_INLINE")
 class TableConfiguration(override val _name:String, val extra:String?=null):TableRef {
 
-  val cols = mutableListOf<Column<*, *>>()
-  var primaryKey: List<ColumnRef<*,*>>? = null
+  val cols = mutableListOf<Column<*, *,*>>()
+  var primaryKey: List<ColumnRef<*,*,*>>? = null
   val foreignKeys = mutableListOf<ForeignKey>()
-  val uniqueKeys = mutableListOf<List<ColumnRef<*,*>>>()
-  val indices = mutableListOf<List<ColumnRef<*,*>>>()
+  val uniqueKeys = mutableListOf<List<ColumnRef<*,*,*>>>()
+  val indices = mutableListOf<List<ColumnRef<*,*,*>>>()
 
-  inline fun <T :Any, S: BaseColumnType<T,S>, C:Column<T,S>, CONF_T : AbstractColumnConfiguration<T, S, C, CONF_T>> CONF_T.add(block: CONF_T.() ->Unit):ColumnRef<T,S> {
-    return apply(block).newColumn().let { it -> cols.add(it); it.ref() }
+  inline fun <T :Any, S: IColumnType<T,S,C>, C:Column<T,S,C>, CONF_T : AbstractColumnConfiguration<T, S, C, CONF_T>> CONF_T.add(block: CONF_T.() ->Unit):ColumnRef<T,S,C> {
+    val newColumn:C = apply(block).newColumn()
+    cols.add(newColumn)
+    return newColumn.ref()
   }
 
   // @formatter:off
@@ -405,63 +422,104 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
   fun MEDIUMTEXT(name:String) = CharColumnConfiguration(this, name, MEDIUMTEXT_T).add({})
   fun LONGTEXT(name: String) = CharColumnConfiguration(this, name, LONGTEXT_T).add({})
 
-  fun INDEX(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { indices.add(mutableListOf(col1).apply { addAll(cols) })}
-  fun UNIQUE(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { uniqueKeys.add(mutableListOf(col1).apply { addAll(cols) })}
-  fun PRIMARY_KEY(col1: ColumnRef<*,*>, vararg cols: ColumnRef<*,*>) { primaryKey = mutableListOf(col1).apply { addAll(cols) }}
+  fun INDEX(col1: ColumnRef<*,*,*>, vararg cols: ColumnRef<*,*,*>) { indices.add(mutableListOf(col1).apply { addAll(cols) })}
+  fun UNIQUE(col1: ColumnRef<*,*,*>, vararg cols: ColumnRef<*,*,*>) { uniqueKeys.add(mutableListOf(col1).apply { addAll(cols) })}
+  fun PRIMARY_KEY(col1: ColumnRef<*,*,*>, vararg cols: ColumnRef<*,*,*>) { primaryKey = mutableListOf(col1).apply { addAll(cols) }}
 
-  class __FOREIGN_KEY__6<T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>, T4:Any, S4: BaseColumnType<T4,S4>, T5:Any, S5: BaseColumnType<T5,S5>, T6:Any, S6: BaseColumnType<T6,S6>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>, val col3:ColumnRef<T3, S3>, val col4:ColumnRef<T4, S4>, val col5:ColumnRef<T5, S5>, val col6:ColumnRef<T6, S6>) {
-    inline fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>, ref3:ColumnRef<T3, S3>, ref4:ColumnRef<T4, S4>, ref5:ColumnRef<T5, S5>, ref6:ColumnRef<T6, S6>) {
+  class __FOREIGN_KEY__6<T1:Any, S1: IColumnType<T1,S1,C1>, C1:Column<T1,S1,C1>,
+                         T2:Any, S2: IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+                         T3:Any, S3: IColumnType<T3,S3,C3>, C3:Column<T3,S3,C3>,
+                         T4:Any, S4: IColumnType<T4,S4,C4>, C4:Column<T4,S4,C4>,
+                         T5:Any, S5: IColumnType<T5,S5,C5>, C5:Column<T5,S5,C5>,
+                         T6:Any, S6: IColumnType<T6,S6,C6>, C6:Column<T6,S6,C6>>(val configuration:TableConfiguration,
+                                                                                    val col1:ColumnRef<T1, S1, C1>, 
+                                                                                    val col2:ColumnRef<T2, S2, C2>, 
+                                                                                    val col3:ColumnRef<T3, S3, C3>, 
+                                                                                    val col4:ColumnRef<T4, S4, C4>, 
+                                                                                    val col5:ColumnRef<T5, S5, C5>, 
+                                                                                    val col6:ColumnRef<T6, S6, C6>) {
+    inline fun REFERENCES(ref1:ColumnRef<T1, S1, C1>,
+                          ref2:ColumnRef<T2, S2, C2>,
+                          ref3:ColumnRef<T3, S3, C3>,
+                          ref4:ColumnRef<T4, S4, C4>,
+                          ref5:ColumnRef<T5, S5, C5>,
+                          ref6:ColumnRef<T6, S6, C6>) {
       configuration.foreignKeys.add(ForeignKey(listOf(col1, col2, col3, col4, col5, col6), ref1.table, listOf(ref1, ref2, ref3, ref4, ref5, ref6).apply { forEach { require(it.table==ref1.table) } }))
     }
   }
 
-  inline fun <T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>, T4:Any, S4: BaseColumnType<T4,S4>, T5:Any, S5: BaseColumnType<T5,S5>, T6:Any, S6: BaseColumnType<T6,S6>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>, col3:ColumnRef<T3, S3>, col4: ColumnRef<T4, S4>, col5:ColumnRef<T5, S5>, col6:ColumnRef<T6, S6>) =
+  inline fun <T1:Any, S1: IColumnType<T1,S1,C1>, C1:Column<T1,S1,C1>,
+              T2:Any, S2: IColumnType<T2,S2,C2>, C2:Column<T2,S2,C2>,
+              T3:Any, S3: IColumnType<T3,S3,C3>, C3:Column<T3,S3,C3>,
+              T4:Any, S4: IColumnType<T4,S4,C4>, C4:Column<T4,S4,C4>,
+              T5:Any, S5: IColumnType<T5,S5,C5>, C5:Column<T5,S5,C5>,
+              T6:Any, S6: IColumnType<T6,S6,C6>, C6:Column<T6,S6,C6>> FOREIGN_KEY(col1: ColumnRef<T1, S1, C1>, col2:ColumnRef<T2, S2, C2>, col3:ColumnRef<T3, S3, C3>, col4: ColumnRef<T4, S4, C4>, col5:ColumnRef<T5, S5, C5>, col6:ColumnRef<T6, S6, C6>) =
       __FOREIGN_KEY__6(this, col1,col2,col3,col4,col5,col6)
 
 
-  class __FOREIGN_KEY__5<T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>, T4:Any, S4: BaseColumnType<T4,S4>, T5:Any, S5: BaseColumnType<T5,S5>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>, val col3:ColumnRef<T3, S3>, val col4:ColumnRef<T4, S4>, val col5:ColumnRef<T5, S5>) {
-    inline fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>, ref3:ColumnRef<T3, S3>, ref4:ColumnRef<T4, S4>, ref5:ColumnRef<T5, S5>) {
+  class __FOREIGN_KEY__5<T1:Any, S1: IColumnType<T1,S1,C1>, C1:Column<T1,S1,C1>,
+                         T2:Any, S2: IColumnType<T2,S2,C2>, C2:Column<T2,S2,C2>,
+                         T3:Any, S3: IColumnType<T3,S3,C3>, C3:Column<T3,S3,C3>,
+                         T4:Any, S4: IColumnType<T4,S4,C4>, C4:Column<T4,S4,C4>,
+                         T5:Any, S5: IColumnType<T5,S5,C5>, C5:Column<T5,S5,C5>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1, C1>, val col2:ColumnRef<T2, S2, C2>, val col3:ColumnRef<T3, S3, C3>, val col4:ColumnRef<T4, S4, C4>, val col5:ColumnRef<T5, S5, C5>) {
+    inline fun REFERENCES(ref1:ColumnRef<T1, S1, C1>, ref2:ColumnRef<T2, S2, C2>, ref3:ColumnRef<T3, S3, C3>, ref4:ColumnRef<T4, S4, C4>, ref5:ColumnRef<T5, S5, C5>) {
       configuration.foreignKeys.add(ForeignKey(listOf(col1, col2, col3, col4, col5), ref1.table, listOf(ref1, ref2, ref3, ref4, ref5).apply { forEach { require(it.table==ref1.table) } }))
     }
   }
 
-  inline fun <T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>, T4:Any, S4: BaseColumnType<T4,S4>, T5:Any, S5: BaseColumnType<T5,S5>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>, col3:ColumnRef<T3, S3>, col4: ColumnRef<T4, S4>, col5:ColumnRef<T5, S5>) =
+  inline fun <T1:Any, S1: IColumnType<T1,S1,C1>, C1:Column<T1,S1,C1>,
+              T2:Any, S2: IColumnType<T2,S2,C2>, C2:Column<T2,S2,C2>,
+              T3:Any, S3: IColumnType<T3,S3,C3>, C3:Column<T3,S3,C3>,
+              T4:Any, S4: IColumnType<T4,S4,C4>, C4:Column<T4,S4,C4>,
+              T5:Any, S5: IColumnType<T5,S5,C5>, C5:Column<T5,S5,C5>> FOREIGN_KEY(col1: ColumnRef<T1, S1, C1>, col2:ColumnRef<T2, S2, C2>, col3:ColumnRef<T3, S3, C3>, col4: ColumnRef<T4, S4, C4>, col5:ColumnRef<T5, S5, C5>) =
       __FOREIGN_KEY__5(this, col1,col2,col3,col4,col5)
 
-  class __FOREIGN_KEY__4<T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>, T4:Any, S4: BaseColumnType<T4,S4>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>, val col3:ColumnRef<T3, S3>, val col4:ColumnRef<T4, S4>) {
-    inline fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>, ref3:ColumnRef<T3, S3>, ref4:ColumnRef<T4, S4>) {
+  class __FOREIGN_KEY__4<T1:Any, S1: IColumnType<T1,S1,C1>, C1:Column<T1,S1,C1>,
+                         T2:Any, S2: IColumnType<T2,S2,C2>, C2:Column<T2,S2,C2>,
+                         T3:Any, S3: IColumnType<T3,S3,C3>, C3:Column<T3,S3,C3>,
+                         T4:Any, S4: IColumnType<T4,S4,C4>, C4:Column<T4,S4,C4>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1, C1>, val col2:ColumnRef<T2, S2, C2>, val col3:ColumnRef<T3, S3, C3>, val col4:ColumnRef<T4, S4, C4>) {
+    inline fun REFERENCES(ref1:ColumnRef<T1, S1, C1>, ref2:ColumnRef<T2, S2, C2>, ref3:ColumnRef<T3, S3, C3>, ref4:ColumnRef<T4, S4, C4>) {
       configuration.foreignKeys.add(ForeignKey(listOf(col1, col2, col3, col4), ref1.table, listOf(ref1, ref2, ref3, ref4)))
     }
   }
 
-  inline fun <T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>, T4:Any, S4: BaseColumnType<T4,S4>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>, col3:ColumnRef<T3, S3>, col4: ColumnRef<T4, S4>) =
+  inline fun <T1:Any, S1: IColumnType<T1,S1,C1>, C1:Column<T1,S1,C1>,
+              T2:Any, S2: IColumnType<T2,S2,C2>, C2:Column<T2,S2,C2>,
+              T3:Any, S3: IColumnType<T3,S3,C3>, C3:Column<T3,S3,C3>,
+              T4:Any, S4: IColumnType<T4,S4,C4>, C4:Column<T4,S4,C4>> FOREIGN_KEY(col1: ColumnRef<T1, S1, C1>, col2:ColumnRef<T2, S2, C2>, col3:ColumnRef<T3, S3, C3>, col4: ColumnRef<T4, S4, C4>) =
       __FOREIGN_KEY__4(this, col1,col2,col3,col4)
 
-  class __FOREIGN_KEY__3<T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>, val col3:ColumnRef<T3, S3>) {
-    inline fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>, ref3:ColumnRef<T3, S3>) {
+  class __FOREIGN_KEY__3<T1:Any, S1: IColumnType<T1,S1,C1>, C1:Column<T1,S1,C1>,
+                         T2:Any, S2: IColumnType<T2,S2,C2>, C2:Column<T2,S2,C2>,
+                         T3:Any, S3: IColumnType<T3,S3,C3>, C3:Column<T3,S3,C3>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1, C1>, val col2:ColumnRef<T2, S2, C2>, val col3:ColumnRef<T3, S3, C3>) {
+    inline fun REFERENCES(ref1:ColumnRef<T1, S1, C1>, ref2:ColumnRef<T2, S2, C2>, ref3:ColumnRef<T3, S3, C3>) {
       configuration.foreignKeys.add(ForeignKey(listOf(col1, col2, col3), ref1.table, listOf(ref1, ref2, ref3).apply { forEach { require(it.table==ref1.table) } }))
     }
   }
 
-  inline fun <T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>, T3:Any, S3: BaseColumnType<T3,S3>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>, col3:ColumnRef<T3, S3>) =
+  inline fun <T1:Any, S1: IColumnType<T1,S1,C1>, C1:Column<T1,S1,C1>,
+              T2:Any, S2: IColumnType<T2,S2,C2>, C2:Column<T2,S2,C2>,
+              T3:Any, S3: IColumnType<T3,S3,C3>, C3:Column<T3,S3,C3>> FOREIGN_KEY(col1: ColumnRef<T1, S1, C1>, col2:ColumnRef<T2, S2, C2>, col3:ColumnRef<T3, S3, C3>) =
       __FOREIGN_KEY__3(this, col1,col2,col3)
 
-  class __FOREIGN_KEY__2<T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1>, val col2:ColumnRef<T2, S2>) {
-    inline fun REFERENCES(ref1:ColumnRef<T1, S1>, ref2:ColumnRef<T2, S2>) {
+  class __FOREIGN_KEY__2<T1:Any, S1: IColumnType<T1,S1,C1>, C1:Column<T1,S1,C1>,
+ T2:Any, S2: IColumnType<T2,S2,C2>, C2:Column<T2,S2,C2>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1, C1>, val col2:ColumnRef<T2, S2, C2>) {
+    inline fun REFERENCES(ref1:ColumnRef<T1, S1, C1>, ref2:ColumnRef<T2, S2, C2>) {
       configuration.foreignKeys.add(ForeignKey(listOf(col1, col2), ref1.table, listOf(ref1, ref2).apply { require(ref2.table==ref1.table) }))
     }
   }
 
-  inline fun <T1:Any, S1: BaseColumnType<T1,S1>, T2:Any, S2: BaseColumnType<T2,S2>> FOREIGN_KEY(col1: ColumnRef<T1, S1>, col2:ColumnRef<T2, S2>) =
+  inline fun <T1:Any, S1: IColumnType<T1,S1,C1>, C1:Column<T1,S1,C1>,
+ T2:Any, S2: IColumnType<T2,S2,C2>, C2:Column<T2,S2,C2>> FOREIGN_KEY(col1: ColumnRef<T1, S1, C1>, col2:ColumnRef<T2, S2, C2>) =
       __FOREIGN_KEY__2(this, col1,col2)
 
-  class __FOREIGN_KEY__1<T1:Any, S1: BaseColumnType<T1,S1>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1>) {
-    inline fun REFERENCES(ref1:ColumnRef<T1, S1>) {
+  class __FOREIGN_KEY__1<T1:Any, S1: IColumnType<T1,S1,C1>, C1:Column<T1,S1,C1>>(val configuration:TableConfiguration, val col1:ColumnRef<T1, S1, C1>) {
+    inline fun REFERENCES(ref1:ColumnRef<T1, S1, C1>) {
       configuration.foreignKeys.add(ForeignKey(listOf(col1), ref1.table, listOf(ref1)))
     }
   }
 
-  inline fun <T1:Any, S1: BaseColumnType<T1,S1>> FOREIGN_KEY(col1: ColumnRef<T1, S1>) =
+  inline fun <T1:Any, S1: IColumnType<T1,S1,C1>, C1:Column<T1,S1,C1>> FOREIGN_KEY(col1: ColumnRef<T1, S1, C1>) =
       __FOREIGN_KEY__1(this, col1)
   // @formatter:on
 
@@ -494,18 +552,18 @@ class DatabaseConfiguration {
  *                  engine or charset to use.
  */
 interface Table:TableRef {
-  val _cols: List<Column<*, *>>
-  val _primaryKey: List<Column<*, *>>?
+  val _cols: List<Column<*, *, *>>
+  val _primaryKey: List<Column<*, *, *>>?
   val _foreignKeys: List<ForeignKey>
-  val _uniqueKeys: List<List<Column<*, *>>>
-  val _indices: List<List<Column<*, *>>>
+  val _uniqueKeys: List<List<Column<*, *, *>>>
+  val _indices: List<List<Column<*, *, *>>>
   val _extra: String?
 
-  fun column(name:String): Column<*,*>?
+  fun column(name:String): Column<*,*,*>?
   fun ref(): TableRef
-  fun resolve(ref: ColumnRef<*, *>): Column<*, *>
+  fun resolve(ref: ColumnRef<*,*,*>): Column<*,*,*>
 
-  interface FieldAccessor<T:Any, S: ColumnType<T,S,C>, C:Column<T,S>> {
+  interface FieldAccessor<T:Any, S: ColumnType<T,S,C>, C:Column<T,S,C>> {
     operator fun getValue(thisRef: Table, property: kotlin.reflect.KProperty<*>): C
   }
 
@@ -545,14 +603,14 @@ operator fun Table.get(name:String) = this.column(name) ?: throw NoSuchElementEx
  *                  engine or charset to use.
  */
 abstract class ImmutableTable private constructor(override val _name: String,
-                                                  override val _cols: List<Column<*, *>>,
-                                                  override val _primaryKey: List<Column<*, *>>?,
+                                                  override val _cols: List<Column<*,*,*>>,
+                                                  override val _primaryKey: List<Column<*,*,*>>?,
                                                   override val _foreignKeys: List<ForeignKey>,
-                                                  override val _uniqueKeys: List<List<Column<*, *>>>,
-                                                  override val _indices: List<List<Column<*, *>>>,
+                                                  override val _uniqueKeys: List<List<Column<*,*,*>>>,
+                                                  override val _indices: List<List<Column<*,*,*>>>,
                                                   override val _extra: String?) : AbstractTable() {
 
-  private constructor(c: TableConfiguration):this(c._name, c.cols, c.primaryKey?.let {c.cols.resolve(it)}, c.foreignKeys, c.uniqueKeys.map({c.cols.resolve(it)}), c.indices.map({c.cols.resolve(it)}), c.extra)
+  private constructor(c: TableConfiguration):this(c._name, c.cols, c.primaryKey?.let {c.cols.resolveAll(it)}, c.foreignKeys, c.uniqueKeys.map({c.cols.resolveAll(it)}), c.indices.map({c.cols.resolveAll(it)}), c.extra)
 
   /**
    * The main use of this class is through inheriting this constructor.
@@ -560,7 +618,7 @@ abstract class ImmutableTable private constructor(override val _name: String,
   constructor(name:String, extra: String? = null, block: TableConfiguration.()->Unit): this(
         TableConfiguration(name, extra).apply(block)  )
 
-  protected fun <T:Any, S: ColumnType<T, S, C>, C:Column<T,S>> type(type: ColumnType<T, S, C>) = TypeFieldAccessor<T, S, C>(
+  protected fun <T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>> type(type: ColumnType<T, S, C>) = TypeFieldAccessor<T, S, C>(
         type)
 
 }

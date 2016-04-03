@@ -31,7 +31,7 @@ import uk.ac.bournemouth.kotlinsql.ColumnType.DecimalColumnType.*
 /**
  * Created by pdvrieze on 01/04/16.
  */
-sealed abstract class AbstractColumnConfiguration<T:Any, S: BaseColumnType<T, S>,out C: Column<T, S>, out CONF_T>(val table: TableRef, val name: String, val type: S) {
+sealed abstract class AbstractColumnConfiguration<T:Any, S: IColumnType<T, S, C>, C: Column<T, S, C>, out CONF_T>(val table: TableRef, val name: String, val type: S) {
 
   enum class ColumnFormat { FIXED, MEMORY, DEFAULT }
   enum class StorageFormat { DISK, MEMORY, DEFAULT }
@@ -54,7 +54,7 @@ sealed abstract class AbstractColumnConfiguration<T:Any, S: BaseColumnType<T, S>
   inline fun COMMENT(comment:String) { this.comment = comment }
   inline fun COLUMN_FORMAT(format: ColumnFormat) { columnFormat = format }
   inline fun STORAGE(format: StorageFormat) { storageFormat = format }
-  inline fun REFERENCES(table: TableRef, col1: ColumnRef<*, *>, vararg columns: ColumnRef<*, *>) {
+  inline fun REFERENCES(table: TableRef, col1: ColumnRef<*,*,*>, vararg columns: ColumnRef<*,*,*>) {
     references= ColsetRef(table, col1, *columns)
   }
 
