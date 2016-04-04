@@ -22,24 +22,21 @@
  * Created by pdvrieze on 04/04/16.
  */
 
-package gen.selects
+package gen.statements
 
 const val count=10
 
+/*
+  class _Statement1<T:Any, S:IColumnType<T,S,C>, C:Column<T,S,C>>(override val select:_Select1<T,S,C>, where:WhereClause):_StatementBase(where)
+ */
+
 fun main(args:Array<String>) {
-  for(n in 2..count) {
+  for(n in 1..count) {
+    print("  class _Statement$n<")
+    (1..n).joinToString(",\n                    ") { m -> "T$m:Any, S$m:IColumnType<T$m,S$m,C$m>, C$m: Column<T$m, S$m, C$m>" }.apply { print(this) }
+    print(">(override val select:_Select$n<")
+    (1..n).joinToString(","){ m -> "T$m,S$m,C$m" }.apply {print(this)}
+    println(">, where:WhereClause):_StatementBase(where)")
     println()
-    print("  class _Select$n<")
-    (1..n).joinToString(",\n                 ") { m -> "T$m:Any, S$m:IColumnType<T$m,S$m,C$m>, C$m: Column<T$m, S$m, C$m>" }.apply{print(this)}
-
-    print(">(")
-    print((1..n).joinToString { m -> "col$m: C$m" })
-    print("):\n        _BaseSelect(")
-    print((1..n).joinToString { m -> "col$m" })
-    println("){")
-    println("      override fun WHERE(config: _Where.() -> WhereClause): Statement =")
-    println("          _Statement$n(this, _Where().config())")
-    println("  }")
-
   }
 }

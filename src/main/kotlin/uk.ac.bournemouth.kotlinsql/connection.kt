@@ -461,13 +461,6 @@ class DBConnection constructor(private val connection: Connection, val db: Datab
 
 }
 
-
-fun String.appendWarnings(warnings: Iterator<SQLWarning>): String {
-  val result = StringBuilder().append(this).append(" - \n    ")
-  warnings.asSequence().map { "${it.errorCode}: ${it.message}" }.joinTo(result, ",\n    ")
-  return result.toString()
-}
-
 /**
  * Executes the given [block] function on this resource and then closes it down correctly whether an exception
  * is thrown or not.

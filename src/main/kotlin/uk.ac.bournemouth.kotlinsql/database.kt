@@ -50,15 +50,85 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
     fun <T:Any, S:ColumnType<T,S,C>, C: Column<T, S,C>> SELECT(col1: C)= Database._Select1(col1)
 
     @JvmStatic
-    fun <T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>,
-         T2:Any, S2:ColumnType<T2,S2,C2>, C2: Column<T2, S2,C2>
-          > SELECT(col1: C1, col2:C2)= Database._Select2(col1, col2)
+    fun <T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+         T2:Any, S2:ColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>> SELECT(col1: C1, col2: C2)=
+        Database._Select2(col1, col2)
 
     @JvmStatic
-    fun <T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>,
-          T2:Any, S2:ColumnType<T2,S2,C2>, C2: Column<T2, S2,C2>,
-          T3:Any, S3:ColumnType<T3,S3,C3>, C3: Column<T3, S3,C3>
-          > SELECT(col1: C1, col2:C2, col3:C3)= Database._Select3(col1, col2, col3)
+    fun <T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+         T2:Any, S2:ColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+         T3:Any, S3:ColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>> SELECT(col1: C1, col2: C2, col3: C3)=
+        Database._Select3(col1, col2, col3)
+
+    @JvmStatic
+    fun <T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+         T2:Any, S2:ColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+         T3:Any, S3:ColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+         T4:Any, S4:ColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>> SELECT(col1: C1, col2: C2, col3: C3, col4: C4)=
+        Database._Select4(col1, col2, col3, col4)
+
+    @JvmStatic
+    fun <T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+         T2:Any, S2:ColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+         T3:Any, S3:ColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+         T4:Any, S4:ColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+         T5:Any, S5:ColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>> SELECT(col1: C1, col2: C2, col3: C3, col4: C4, col5: C5)=
+        Database._Select5(col1, col2, col3, col4, col5)
+
+    @JvmStatic
+    fun <T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+         T2:Any, S2:ColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+         T3:Any, S3:ColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+         T4:Any, S4:ColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+         T5:Any, S5:ColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+         T6:Any, S6:ColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>> SELECT(col1: C1, col2: C2, col3: C3, col4: C4, col5: C5, col6: C6)=
+        Database._Select6(col1, col2, col3, col4, col5, col6)
+
+    @JvmStatic
+    fun <T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+         T2:Any, S2:ColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+         T3:Any, S3:ColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+         T4:Any, S4:ColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+         T5:Any, S5:ColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+         T6:Any, S6:ColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>,
+         T7:Any, S7:ColumnType<T7,S7,C7>, C7: Column<T7, S7, C7>> SELECT(col1: C1, col2: C2, col3: C3, col4: C4, col5: C5, col6: C6, col7: C7)=
+        Database._Select7(col1, col2, col3, col4, col5, col6, col7)
+
+    @JvmStatic
+    fun <T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+         T2:Any, S2:ColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+         T3:Any, S3:ColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+         T4:Any, S4:ColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+         T5:Any, S5:ColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+         T6:Any, S6:ColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>,
+         T7:Any, S7:ColumnType<T7,S7,C7>, C7: Column<T7, S7, C7>,
+         T8:Any, S8:ColumnType<T8,S8,C8>, C8: Column<T8, S8, C8>> SELECT(col1: C1, col2: C2, col3: C3, col4: C4, col5: C5, col6: C6, col7: C7, col8: C8)=
+        Database._Select8(col1, col2, col3, col4, col5, col6, col7, col8)
+
+    @JvmStatic
+    fun <T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+         T2:Any, S2:ColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+         T3:Any, S3:ColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+         T4:Any, S4:ColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+         T5:Any, S5:ColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+         T6:Any, S6:ColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>,
+         T7:Any, S7:ColumnType<T7,S7,C7>, C7: Column<T7, S7, C7>,
+         T8:Any, S8:ColumnType<T8,S8,C8>, C8: Column<T8, S8, C8>,
+         T9:Any, S9:ColumnType<T9,S9,C9>, C9: Column<T9, S9, C9>> SELECT(col1: C1, col2: C2, col3: C3, col4: C4, col5: C5, col6: C6, col7: C7, col8: C8, col9: C9)=
+        Database._Select9(col1, col2, col3, col4, col5, col6, col7, col8, col9)
+
+    @JvmStatic
+    fun <T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+         T2:Any, S2:ColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+         T3:Any, S3:ColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+         T4:Any, S4:ColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+         T5:Any, S5:ColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+         T6:Any, S6:ColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>,
+         T7:Any, S7:ColumnType<T7,S7,C7>, C7: Column<T7, S7, C7>,
+         T8:Any, S8:ColumnType<T8,S8,C8>, C8: Column<T8, S8, C8>,
+         T9:Any, S9:ColumnType<T9,S9,C9>, C9: Column<T9, S9, C9>,
+         T10:Any, S10:ColumnType<T10,S10,C10>, C10: Column<T10, S10, C10>> SELECT(col1: C1, col2: C2, col3: C3, col4: C4, col5: C5, col6: C6, col7: C7, col8: C8, col9: C9, col10: C10)=
+        Database._Select10(col1, col2, col3, col4, col5, col6, col7, col8, col9, col10)
 
   }
 
@@ -164,12 +234,78 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
     fun toSQL(): String
   }
 
-  class _Statement1<T:Any, S:IColumnType<T,S,C>, C:Column<T,S,C>>(override val select:_Select1<T,S,C>, val where:WhereClause):Statement {
+  abstract class _StatementBase(val where:WhereClause): Statement {
     override fun toSQL(): String {
       val prefixMap = select.createTablePrefixMap()
       return "${select.toSQL(prefixMap)} WHERE ${where.toSQL(prefixMap)}"
     }
   }
+
+  class _Statement1<T:Any, S:IColumnType<T,S,C>, C:Column<T,S,C>>(override val select:_Select1<T,S,C>, where:WhereClause):_StatementBase(where)
+
+  class _Statement2<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+                    T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>>(override val select:_Select2<T1,S1,C1,T2,S2,C2>, where:WhereClause):_StatementBase(where)
+
+  class _Statement3<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+                    T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+                    T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>>(override val select:_Select3<T1,S1,C1,T2,S2,C2,T3,S3,C3>, where:WhereClause):_StatementBase(where)
+
+  class _Statement4<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+                    T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+                    T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+                    T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>>(override val select:_Select4<T1,S1,C1,T2,S2,C2,T3,S3,C3,T4,S4,C4>, where:WhereClause):_StatementBase(where)
+
+  class _Statement5<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+                    T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+                    T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+                    T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+                    T5:Any, S5:IColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>>(override val select:_Select5<T1,S1,C1,T2,S2,C2,T3,S3,C3,T4,S4,C4,T5,S5,C5>, where:WhereClause):_StatementBase(where)
+
+  class _Statement6<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+                    T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+                    T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+                    T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+                    T5:Any, S5:IColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+                    T6:Any, S6:IColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>>(override val select:_Select6<T1,S1,C1,T2,S2,C2,T3,S3,C3,T4,S4,C4,T5,S5,C5,T6,S6,C6>, where:WhereClause):_StatementBase(where)
+
+  class _Statement7<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+                    T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+                    T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+                    T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+                    T5:Any, S5:IColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+                    T6:Any, S6:IColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>,
+                    T7:Any, S7:IColumnType<T7,S7,C7>, C7: Column<T7, S7, C7>>(override val select:_Select7<T1,S1,C1,T2,S2,C2,T3,S3,C3,T4,S4,C4,T5,S5,C5,T6,S6,C6,T7,S7,C7>, where:WhereClause):_StatementBase(where)
+
+  class _Statement8<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+                    T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+                    T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+                    T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+                    T5:Any, S5:IColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+                    T6:Any, S6:IColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>,
+                    T7:Any, S7:IColumnType<T7,S7,C7>, C7: Column<T7, S7, C7>,
+                    T8:Any, S8:IColumnType<T8,S8,C8>, C8: Column<T8, S8, C8>>(override val select:_Select8<T1,S1,C1,T2,S2,C2,T3,S3,C3,T4,S4,C4,T5,S5,C5,T6,S6,C6,T7,S7,C7,T8,S8,C8>, where:WhereClause):_StatementBase(where)
+
+  class _Statement9<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+                    T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+                    T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+                    T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+                    T5:Any, S5:IColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+                    T6:Any, S6:IColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>,
+                    T7:Any, S7:IColumnType<T7,S7,C7>, C7: Column<T7, S7, C7>,
+                    T8:Any, S8:IColumnType<T8,S8,C8>, C8: Column<T8, S8, C8>,
+                    T9:Any, S9:IColumnType<T9,S9,C9>, C9: Column<T9, S9, C9>>(override val select:_Select9<T1,S1,C1,T2,S2,C2,T3,S3,C3,T4,S4,C4,T5,S5,C5,T6,S6,C6,T7,S7,C7,T8,S8,C8,T9,S9,C9>, where:WhereClause):_StatementBase(where)
+
+  class _Statement10<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+                     T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+                     T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+                     T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+                     T5:Any, S5:IColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+                     T6:Any, S6:IColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>,
+                     T7:Any, S7:IColumnType<T7,S7,C7>, C7: Column<T7, S7, C7>,
+                     T8:Any, S8:IColumnType<T8,S8,C8>, C8: Column<T8, S8, C8>,
+                     T9:Any, S9:IColumnType<T9,S9,C9>, C9: Column<T9, S9, C9>,
+                     T10:Any, S10:IColumnType<T10,S10,C10>, C10: Column<T10, S10, C10>>(override val select:_Select10<T1,S1,C1,T2,S2,C2,T3,S3,C3,T4,S4,C4,T5,S5,C5,T6,S6,C6,T7,S7,C7,T8,S8,C8,T9,S9,C9,T10,S10,C10>, where:WhereClause):_StatementBase(where)
+
 
   interface Select:Statement {
     fun createTablePrefixMap(): Map<String, String>?
@@ -248,79 +384,104 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
     override fun toSQL(prefixMap: Map<String, String>?) = toSQL()
   }
 
-  class _Select2<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>,
-        T2: kotlin.Any, S2: uk.ac.bournemouth.kotlinsql.IColumnType<T2, S2, C2>, C2: Column<T2, S2, C2>>(col1:C1, col2:C2):_BaseSelect(col1, col2) {}
+  class _Select2<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+      T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>>(col1: C1, col2: C2):
+      _BaseSelect(col1, col2){
+    override fun WHERE(config: _Where.() -> WhereClause): Statement =
+        _Statement2(this, _Where().config())
+  }
 
-  class _Select3<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>,
-        T2: kotlin.Any, S2: IColumnType<T2, S2, C2>, C2: Column<T2, S2, C2>,
-        T3: kotlin.Any, S3: IColumnType<T3, S3, C3>, C3: Column<T3, S3, C3>
-        >(col1:C1, col2:C2, col3:C3):_BaseSelect(col1, col2, col3) {}
+  class _Select3<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+      T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+      T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>>(col1: C1, col2: C2, col3: C3):
+      _BaseSelect(col1, col2, col3){
+    override fun WHERE(config: _Where.() -> WhereClause): Statement =
+        _Statement3(this, _Where().config())
+  }
 
-  class _Select4<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>,
-        T2: kotlin.Any, S2: IColumnType<T2, S2, C2>, C2: Column<T2, S2, C2>,
-        T3: kotlin.Any, S3: IColumnType<T3, S3, C3>, C3: Column<T3, S3, C3>,
-        T4: kotlin.Any, S4: IColumnType<T4, S4, C4>, C4: Column<T4, S4, C4>
-        >(col1:C1, col2:C2, col3:C3, col4:C4):_BaseSelect(col1, col2, col3, col4) {}
+  class _Select4<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+      T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+      T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+      T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>>(col1: C1, col2: C2, col3: C3, col4: C4):
+      _BaseSelect(col1, col2, col3, col4){
+    override fun WHERE(config: _Where.() -> WhereClause): Statement =
+        _Statement4(this, _Where().config())
+  }
 
-  class _Select5<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>,
-        T2: kotlin.Any, S2: IColumnType<T2, S2, C2>, C2: Column<T2, S2, C2>,
-        T3: kotlin.Any, S3: IColumnType<T3, S3, C3>, C3: Column<T3, S3, C3>,
-        T4: kotlin.Any, S4: IColumnType<T4, S4, C4>, C4: Column<T4, S4, C4>,
-        T5: kotlin.Any, S5: IColumnType<T5, S5, C5>, C5: Column<T5, S5, C5>
-        >(col1:C1, col2:C2, col3:C3, col4:C4, col5:C5):_BaseSelect(col1, col2, col3, col4, col5) {}
+  class _Select5<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+      T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+      T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+      T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+      T5:Any, S5:IColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>>(col1: C1, col2: C2, col3: C3, col4: C4, col5: C5):
+      _BaseSelect(col1, col2, col3, col4, col5){
+    override fun WHERE(config: _Where.() -> WhereClause): Statement =
+        _Statement5(this, _Where().config())
+  }
 
-  class _Select6<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>,
-        T2: kotlin.Any, S2: IColumnType<T2, S2, C2>, C2: Column<T2, S2, C2>,
-        T3: kotlin.Any, S3: IColumnType<T3, S3, C3>, C3: Column<T3, S3, C3>,
-        T4: kotlin.Any, S4: IColumnType<T4, S4, C4>, C4: Column<T4, S4, C4>,
-        T5: kotlin.Any, S5: IColumnType<T5, S5, C5>, C5: Column<T5, S5, C5>,
-        T6: kotlin.Any, S6: IColumnType<T6, S6, C6>, C6: Column<T6, S6, C6>
-        >(col1:C1, col2:C2, col3:C3, col4:C4, col5:C5, col6:C6):_BaseSelect(col1, col2, col3, col4, col5, col6) {}
+  class _Select6<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+      T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+      T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+      T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+      T5:Any, S5:IColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+      T6:Any, S6:IColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>>(col1: C1, col2: C2, col3: C3, col4: C4, col5: C5, col6: C6):
+      _BaseSelect(col1, col2, col3, col4, col5, col6){
+    override fun WHERE(config: _Where.() -> WhereClause): Statement =
+        _Statement6(this, _Where().config())
+  }
 
-  class _Select7<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>,
-        T2: kotlin.Any, S2: IColumnType<T2, S2, C2>, C2: Column<T2, S2, C2>,
-        T3: kotlin.Any, S3: IColumnType<T3, S3, C3>, C3: Column<T3, S3, C3>,
-        T4: kotlin.Any, S4: IColumnType<T4, S4, C4>, C4: Column<T4, S4, C4>,
-        T5: kotlin.Any, S5: IColumnType<T5, S5, C5>, C5: Column<T5, S5, C5>,
-        T6: kotlin.Any, S6: IColumnType<T6, S6, C6>, C6: Column<T6, S6, C6>,
-        T7: kotlin.Any, S7: IColumnType<T7, S7, C7>, C7: Column<T7, S7, C7>
-  >(col1:C1, col2:C2, col3:C3, col4:C4, col5:C5, col6:C6, col7:C7):_BaseSelect(col1, col2, col3, col4, col5, col6, col7) {}
+  class _Select7<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+      T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+      T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+      T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+      T5:Any, S5:IColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+      T6:Any, S6:IColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>,
+      T7:Any, S7:IColumnType<T7,S7,C7>, C7: Column<T7, S7, C7>>(col1: C1, col2: C2, col3: C3, col4: C4, col5: C5, col6: C6, col7: C7):
+      _BaseSelect(col1, col2, col3, col4, col5, col6, col7){
+    override fun WHERE(config: _Where.() -> WhereClause): Statement =
+        _Statement7(this, _Where().config())
+  }
 
-  class _Select8<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>,
-        T2: kotlin.Any, S2: IColumnType<T2, S2, C2>, C2: Column<T2, S2, C2>,
-        T3: kotlin.Any, S3: IColumnType<T3, S3, C3>, C3: Column<T3, S3, C3>,
-        T4: kotlin.Any, S4: IColumnType<T4, S4, C4>, C4: Column<T4, S4, C4>,
-        T5: kotlin.Any, S5: IColumnType<T5, S5, C5>, C5: Column<T5, S5, C5>,
-        T6: kotlin.Any, S6: IColumnType<T6, S6, C6>, C6: Column<T6, S6, C6>,
-        T7: kotlin.Any, S7: IColumnType<T7, S7, C7>, C7: Column<T7, S7, C7>,
-        T8: kotlin.Any, S8: IColumnType<T8, S8, C8>, C8: Column<T8, S8, C8>
-        >(col1:C1, col2:C2, col3:C3, col4:C4, col5:C5, col6:C6, col7:C7, col8:C8):
-              _BaseSelect(col1, col2, col3, col4, col5, col6, col7, col8) {}
+  class _Select8<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+      T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+      T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+      T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+      T5:Any, S5:IColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+      T6:Any, S6:IColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>,
+      T7:Any, S7:IColumnType<T7,S7,C7>, C7: Column<T7, S7, C7>,
+      T8:Any, S8:IColumnType<T8,S8,C8>, C8: Column<T8, S8, C8>>(col1: C1, col2: C2, col3: C3, col4: C4, col5: C5, col6: C6, col7: C7, col8: C8):
+      _BaseSelect(col1, col2, col3, col4, col5, col6, col7, col8){
+    override fun WHERE(config: _Where.() -> WhereClause): Statement =
+        _Statement8(this, _Where().config())
+  }
 
-  class _Select9<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>,
-        T2: kotlin.Any, S2: IColumnType<T2, S2, C2>, C2: Column<T2, S2, C2>,
-        T3: kotlin.Any, S3: IColumnType<T3, S3, C3>, C3: Column<T3, S3, C3>,
-        T4: kotlin.Any, S4: IColumnType<T4, S4, C4>, C4: Column<T4, S4, C4>,
-        T5: kotlin.Any, S5: IColumnType<T5, S5, C5>, C5: Column<T5, S5, C5>,
-        T6: kotlin.Any, S6: IColumnType<T6, S6, C6>, C6: Column<T6, S6, C6>,
-        T7: kotlin.Any, S7: IColumnType<T7, S7, C7>, C7: Column<T7, S7, C7>,
-        T8: kotlin.Any, S8: IColumnType<T8, S8, C8>, C8: Column<T8, S8, C8>,
-        T9: kotlin.Any, S9: IColumnType<T9, S9, C9>, C9: Column<T9, S9, C9>
-        >(col1:C1, col2:C2, col3:C3, col4:C4, col5:C5, col6:C6, col7:C7, col8:C8, col9:C9):
-              _BaseSelect(col1, col2, col3, col4, col5, col6, col7, col8, col9) {}
+  class _Select9<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+      T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+      T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+      T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+      T5:Any, S5:IColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+      T6:Any, S6:IColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>,
+      T7:Any, S7:IColumnType<T7,S7,C7>, C7: Column<T7, S7, C7>,
+      T8:Any, S8:IColumnType<T8,S8,C8>, C8: Column<T8, S8, C8>,
+      T9:Any, S9:IColumnType<T9,S9,C9>, C9: Column<T9, S9, C9>>(col1: C1, col2: C2, col3: C3, col4: C4, col5: C5, col6: C6, col7: C7, col8: C8, col9: C9):
+      _BaseSelect(col1, col2, col3, col4, col5, col6, col7, col8, col9){
+    override fun WHERE(config: _Where.() -> WhereClause): Statement =
+        _Statement9(this, _Where().config())
+  }
 
-  class _Select10<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>,
-        T2: kotlin.Any, S2: IColumnType<T2, S2, C2>, C2: Column<T2, S2, C2>,
-        T3: kotlin.Any, S3: IColumnType<T3, S3, C3>, C3: Column<T3, S3, C3>,
-        T4: kotlin.Any, S4: IColumnType<T4, S4, C4>, C4: Column<T4, S4, C4>,
-        T5: kotlin.Any, S5: IColumnType<T5, S5, C5>, C5: Column<T5, S5, C5>,
-        T6: kotlin.Any, S6: IColumnType<T6, S6, C6>, C6: Column<T6, S6, C6>,
-        T7: kotlin.Any, S7: IColumnType<T7, S7, C7>, C7: Column<T7, S7, C7>,
-        T8: kotlin.Any, S8: IColumnType<T8, S8, C8>, C8: Column<T8, S8, C8>,
-        T9: kotlin.Any, S9: IColumnType<T9, S9, C9>, C9: Column<T9, S9, C9>,
-        T10: kotlin.Any, S10: IColumnType<T10, S10, C10>, C10: Column<T10, S10, C10>
-        >(col1:C1, col2:C2, col3:C3, col4:C4, col5:C5, col6:C6, col7:C7, col8:C8, col9:C9, col10:C10):
-        _BaseSelect(col1, col2, col3, col4, col5, col6, col7, col8, col9, col10) {}
+  class _Select10<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>,
+      T2:Any, S2:IColumnType<T2,S2,C2>, C2: Column<T2, S2, C2>,
+      T3:Any, S3:IColumnType<T3,S3,C3>, C3: Column<T3, S3, C3>,
+      T4:Any, S4:IColumnType<T4,S4,C4>, C4: Column<T4, S4, C4>,
+      T5:Any, S5:IColumnType<T5,S5,C5>, C5: Column<T5, S5, C5>,
+      T6:Any, S6:IColumnType<T6,S6,C6>, C6: Column<T6, S6, C6>,
+      T7:Any, S7:IColumnType<T7,S7,C7>, C7: Column<T7, S7, C7>,
+      T8:Any, S8:IColumnType<T8,S8,C8>, C8: Column<T8, S8, C8>,
+      T9:Any, S9:IColumnType<T9,S9,C9>, C9: Column<T9, S9, C9>,
+      T10:Any, S10:IColumnType<T10,S10,C10>, C10: Column<T10, S10, C10>>(col1: C1, col2: C2, col3: C3, col4: C4, col5: C5, col6: C6, col7: C7, col8: C8, col9: C9, col10: C10):
+      _BaseSelect(col1, col2, col3, col4, col5, col6, col7, col8, col9, col10){
+    override fun WHERE(config: _Where.() -> WhereClause): Statement =
+        _Statement10(this, _Where().config())
+  }
 
 }
 
