@@ -18,21 +18,54 @@
  * under the License.
  */
 
+ext {
+    if (! rootProject.ext.has('kotlin_version') ) { kotlin_version = '1.0.1-2' }
+}
+
+buildscript {
+
+    ext {
+        if (! rootProject.ext.has('kotlin_version') ) { kotlin_version = '1.0.1-2' }
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+
+    repositories {
+        jcenter()
+    }
+}
+
 apply plugin: 'kotlin'
 
 description = 'A utility library for working with databases in kotlin'
 
-ext {
-    if (! rootProject.ext.has('kotlin_version') ) { kotlin_version = '1.0.1-2' }
+repositories {
+    jcenter()
+}
+
+
+configurations {
+    generate
 }
 
 test {
     useTestNG()
 }
 
+sourceSets {
+    generate  {
+        java {
+            srcDir 'src/gen/kotlin'
+        }
+    }
+}
+
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     compile "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
+
+    generateCompile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 
     testCompile 'org.testng:testng:6.9.9'
 }
