@@ -22,26 +22,29 @@
  * Created by pdvrieze on 04/04/16.
  */
 
-package gen.selects
+package gen.statics
 
 const val count=10
 
-fun main(args:Array<String>) {
-  for(n in 2..count) {
-    println()
-    print("class _Select$n<")
-    for (m in 1..n) {
-      print("\n        T$m:Any, S$m:IColumnType<T$m,S$m,C$m>, C$m: Column<T$m, S$m, C$m>")
-      if (m<n) {print(',') }
-    }
-    print(">(")
-    print((1..n).joinToString { m -> "col$m: C$m" })
-    print("):\n      _BaseSelect(")
-    print((1..n).joinToString { m -> "col$m" })
-    println("){")
-    println("    override fun WHERE(config: _Where.() -> WhereClause): Statement =")
-    println("        _Statement$n(this, _Where().config())")
-    println("}")
+/*
+    @JvmStatic
+  fun <T1:Any, S1:ColumnType<T1,S1,C1>, C1: Column<T1, S1,C1>,
+       T2:Any, S2:ColumnType<T2,S2,C2>, C2: Column<T2, S2,C2>
+        > SELECT(col1: C1, col2:C2)= Database._Select2(col1, col2)
 
+ */
+
+fun main(args:Array<String>) {
+  for(n in 1..count) {
+    println("    @JvmStatic")
+    print("    fun <")
+    (1..n).joinToString(",\n         ") { m -> "T$m:Any, S$m:ColumnType<T$m,S$m,C$m>, C$m: Column<T$m, S$m, C$m>" }.apply { print(this) }
+    print("> SELECT(")
+    (1..n).joinToString{ m -> "col$m: C$m" }.apply {print(this)}
+    println(")=")
+    print("        Database._Select$n(")
+    (1..n).joinToString{ m -> "col$m" }.apply {print(this)}
+    println(")")
+    println()
   }
 }
