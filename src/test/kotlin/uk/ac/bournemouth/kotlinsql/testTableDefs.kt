@@ -52,7 +52,7 @@ class testTableDefs {
       }
     }
 
-    val statement = table.SELECT(table.name).WHERE { table.index eq 1 }
+    val statement = table.SELECT(table.name).WHERE {  table.index eq 1 }
     assertEquals(statement.toSQL(), "SELECT `name` FROM `TestMakeSQL` WHERE `index` = ?")
 
   }
@@ -70,16 +70,16 @@ class testTableDefs {
 
     val emails = object: MutableTable("emails", null) {
       val index by reference(persons.index) { AUTO_INCREMENT }
-      val emailaddr by VARCHAR("email", 50)
+      val email by VARCHAR("email", 50)
 
       override fun init() {
-        PRIMARY_KEY(index, emailaddr)
+        PRIMARY_KEY(index, email)
         FOREIGN_KEY(index).REFERENCES(persons.index)
       }
     }
 
-    val statement = persons.SELECT(persons.name, emails.emailaddr).WHERE { persons.index eq emails.index }
-    assertEquals(statement.toSQL(), "SELECT `name` FROM `persons` as p WHERE `index` = ?")
+    val statement = persons.SELECT(persons.name, emails.email).WHERE { persons.index eq emails.index }
+    assertEquals(statement.toSQL(), "SELECT p.`name`, e.`email` FROM `emails` AS e, `persons` AS p WHERE p.`index` = e.`index`")
 
   }
 

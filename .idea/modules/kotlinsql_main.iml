@@ -3,6 +3,9 @@
   <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_1_8" inherit-compiler-output="false">
     <output url="file://$MODULE_DIR$/../../build/classes/main" />
     <exclude-output />
+    <content url="file://$MODULE_DIR$/../../gen">
+      <sourceFolder url="file://$MODULE_DIR$/../../gen/kotlin" isTestSource="false" generated="true" />
+    </content>
     <content url="file://$MODULE_DIR$/../../src/main">
       <sourceFolder url="file://$MODULE_DIR$/../../src/main/java" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/../../src/main/kotlin" isTestSource="false" />

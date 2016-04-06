@@ -6,8 +6,6 @@
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/buildSrc_main.iml" filepath="$PROJECT_DIR$/.idea/modules/buildSrc_main.iml" group="buildSrc" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/buildSrc_test.iml" filepath="$PROJECT_DIR$/.idea/modules/buildSrc_test.iml" group="buildSrc" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/kotlinsql.iml" filepath="$PROJECT_DIR$/.idea/modules/kotlinsql.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/kotlinsql_generate.iml" filepath="$PROJECT_DIR$/.idea/modules/kotlinsql_generate.iml" group="kotlinsql" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/kotlinsql_generatedSources.iml" filepath="$PROJECT_DIR$/.idea/modules/kotlinsql_generatedSources.iml" group="kotlinsql" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/kotlinsql_main.iml" filepath="$PROJECT_DIR$/.idea/modules/kotlinsql_main.iml" group="kotlinsql" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/kotlinsql_test.iml" filepath="$PROJECT_DIR$/.idea/modules/kotlinsql_test.iml" group="kotlinsql" />
     </modules>

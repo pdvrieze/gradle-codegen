@@ -25,6 +25,7 @@ import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.file.FileCollection
+import org.gradle.api.plugins.JavaBasePlugin
 import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginConvention
 import org.gradle.api.tasks.*
@@ -43,12 +44,10 @@ open class GenerateTask: DefaultTask() {
 
   init {
     group = "generate"
+    outputs.upToDateWhen { task-> false } // do something smarter
   }
 
-//  @InputFiles
-  var inputFiles: FileCollection = project.files()
-
-//  @OutputDirectory
+  @OutputDirectory
   var outputDir:File = project.file(DEFAULT_GEN_DIR)
 //
 //  @OutputFiles
@@ -60,7 +59,7 @@ open class GenerateTask: DefaultTask() {
 //      }
 //    }
 
-//  @Input
+  @Input
   internal var container: NamedDomainObjectContainer<GenerateSpec>? = null
 
   @TaskAction
@@ -111,9 +110,10 @@ class GenerateSpec(val name: String) {
 class BuilderPlugin: Plugin<Project> {
 
   override fun apply(project: Project) {
-    project.pluginManager.apply(JavaPlugin::class.java)
+    val javaBasePlugin = project.plugins.apply(JavaBasePlugin::class.java)
+    project.plugins.apply(JavaPlugin::class.java)
+
     val sourceSets = project.sourceSets
-    val generateSourceSet: SourceSet = sourceSets.create("generatedSources")
 
     val generateExt = project.container(GenerateSpec::class.java)
     project.extensions.add("generate", generateExt)
@@ -126,7 +126,17 @@ class BuilderPlugin: Plugin<Project> {
       this.outputDir = outputDir
       container = generateExt
     }
-    sourceSets.get("main").java.srcDirs.add(outputDir)
+    val cleanGenerate = project.tasks.create("cleanGenerate") { clean ->
+      clean.description = "Clean the generated source folder"
+      clean.doFirst { project.delete(outputDir) }
+    }
+//    project.task("clean").dependsOn.add(cleanGenerate)
+
+    val main:SourceSet = sourceSets.get("main")
+    main.java.srcDir(outputDir)
+    project.afterEvaluate {
+      main.java.srcDirs.add(outputDir)
+    }
 
     project.tasks.getByName(JavaPlugin.COMPILE_JAVA_TASK_NAME).dependsOn.add(task)
 

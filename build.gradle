@@ -1,3 +1,7 @@
+import kotlinsql.builder.GenerateDatabaseBaseKt
+import kotlinsql.builder.GenerateSelectClasses
+import kotlinsql.builder.GenerateStatementsKt
+
 /*
  * Copyright (c) 2016.
  *
@@ -52,29 +56,23 @@ repositories {
 }
 
 
-configurations {
-    generate
-}
-
 test {
     useTestNG()
 }
 
-sourceSets {
-    generate  {
-        java {
-            srcDir 'src/gen/kotlin'
-        }
-    }
-}
-
 generate {
-    baz{
-        output = 'foo/bar/try.txt'
-        generator = { out, inputs ->
-            project.logger.quiet("In the generator")
-            out.append("hello")
-        }
+    def depth = 10
+    databaseFunctions{
+        output = 'gen/DatabaseMethods.kt'
+        generator = new GenerateDatabaseBaseKt(depth)
+    }
+    selects{
+        output = 'gen/selectImpls.kt'
+        generator = new GenerateSelectClasses(depth)
+    }
+    statements{
+        output = 'gen/statementImpls.kt'
+        generator = new GenerateStatementsKt(depth)
     }
 }
 
@@ -82,8 +80,6 @@ generate {
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     compile "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
-
-    generateCompile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 
     testCompile 'org.testng:testng:6.9.9'
 }
