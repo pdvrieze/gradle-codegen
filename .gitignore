@@ -1,4 +1,9 @@
+/buildSrc/.gradle
+/gen
+/buildSrc/build
 build
-.idea/libraries
-.idea/workspace.xml
-.gradle
+/.idea/libraries
+/.idea/workspace.xml
+/.gradle
+/.idea/modules
+/.idea/modules.xml
