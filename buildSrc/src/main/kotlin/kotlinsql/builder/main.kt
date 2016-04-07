@@ -20,20 +20,25 @@
 
 package kotlinsql.builder
 
+import groovy.lang.Closure
 import org.gradle.api.DefaultTask
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.file.FileCollection
+import org.gradle.api.internal.HasConvention
+import org.gradle.api.plugins.BasePlugin
 import org.gradle.api.plugins.JavaBasePlugin
 import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginConvention
 import org.gradle.api.tasks.*
 import org.gradle.plugins.ide.idea.model.IdeaModel
+import org.gradle.util.ConfigureUtil
 import java.io.File
 import java.io.StringWriter
 import java.io.Writer
 import java.util.*
+import java.util.concurrent.Callable
 
 val Project.sourceSets: SourceSetContainer
   get() = project.convention.getPlugin(JavaPluginConvention::class.java).sourceSets
@@ -48,7 +53,7 @@ open class GenerateTask: DefaultTask() {
   }
 
   @OutputDirectory
-  var outputDir:File = project.file(DEFAULT_GEN_DIR)
+  var outputDir:Any = project.file(DEFAULT_GEN_DIR)
 //
 //  @OutputFiles
 //  val outputFiles  = project.files().apply {
@@ -67,7 +72,7 @@ open class GenerateTask: DefaultTask() {
 
     container?.all { spec: GenerateSpec ->
       if (spec.output!=null) {
-        val outFile = File(outputDir, spec.output)
+        val outFile = File(project.file(outputDir), project.file(spec.output).path)
         if (project.logger.isInfoEnabled) {
           project.logger.info("Generating ${spec.name} as '${spec.output}' as '${outFile}'")
         } else {
@@ -79,7 +84,7 @@ open class GenerateTask: DefaultTask() {
             outFile.createNewFile()
           }
           outFile.writer().use { writer ->
-            g.doGenerate(writer, spec.input)
+            g.doGenerate(writer, project.files(spec.input))
           }
 
         } ?: logger.quiet("Missing output code for generateSpec ${spec.name}")
@@ -100,12 +105,18 @@ interface GenerateImpl {
 }
 
 class GenerateSpec(val name: String) {
-  var output: String?=null
+  var output: Any?=null
   var generator: GenerateImpl?=null
-  var input: FileCollection?=null
+  var input: Any?=null
 }
 
+open class GenerateSourceSet(val name:String, val generate:NamedDomainObjectContainer<GenerateSpec>) {
 
+  fun generate(configureClosure: Closure<Any?>?): GenerateSourceSet {
+    ConfigureUtil.configure(configureClosure, generate)
+    return this
+  }
+}
 
 class BuilderPlugin: Plugin<Project> {
 
@@ -113,38 +124,54 @@ class BuilderPlugin: Plugin<Project> {
     val javaBasePlugin = project.plugins.apply(JavaBasePlugin::class.java)
     project.plugins.apply(JavaPlugin::class.java)
 
-    val sourceSets = project.sourceSets
+    val sourceSets = project.sourceSets.all {sourceSet ->
+      val generateTaskName = if(sourceSet.name=="main") "generate" else sourceSet.getTaskName("generate",null)
+      val cleanTaskName = if(sourceSet.name=="main") "${BasePlugin.CLEAN_TASK_NAME}Generate" else sourceSet.getTaskName(BasePlugin.CLEAN_TASK_NAME,"generate")
 
-    val generateExt = project.container(GenerateSpec::class.java)
-    project.extensions.add("generate", generateExt)
+      val configuration = project.configurations.create(generateTaskName)
+      project.configurations.add(configuration)
 
-    val configuration = project.configurations.create("generate")
-
-    val outputDir = project.file(DEFAULT_GEN_DIR)
-    val task = project.tasks.create("generate", GenerateTask::class.java).apply {
-      dependsOn(configuration)
-      this.outputDir = outputDir
-      container = generateExt
-    }
-    val cleanGenerate = project.tasks.create("cleanGenerate") { clean ->
-      clean.description = "Clean the generated source folder"
-      clean.doFirst { project.delete(outputDir) }
-    }
-//    project.task("clean").dependsOn.add(cleanGenerate)
-
-    val main:SourceSet = sourceSets.get("main")
-    main.java.srcDir(outputDir)
-    project.afterEvaluate {
-      main.java.srcDirs.add(outputDir)
-    }
-
-    project.tasks.getByName(JavaPlugin.COMPILE_JAVA_TASK_NAME).dependsOn.add(task)
-
-    project.afterEvaluate {
-      project.extensions.getByType(IdeaModel::class.java)?.let { ideaModel ->
-        ideaModel.module.generatedSourceDirs.add(task.outputDir)
+      val generateExt = project.container(GenerateSpec::class.java)
+      if (sourceSet is HasConvention) {
+        sourceSet.convention.plugins.put("kotlinsql", GenerateSourceSet("generate", generateExt))
+      } else {
+        project.extensions.add(generateTaskName, generateExt)
       }
+
+      val outputDir = project.file("gen/${sourceSet.name}/kotlin")
+
+      val generateTask = project.tasks.create(generateTaskName, GenerateTask::class.java).apply {
+        dependsOn(configuration)
+        this.outputDir = outputDir
+        container = generateExt
+      }
+
+      configuration.files ( object:Closure<Any>(this){ override fun call()= generateTask.outputDir })
+      project.dependencies.add(sourceSet.compileConfigurationName, project.files(Callable{configuration.files}))
+
+      // Late bind the actual output directory
+      sourceSet.java.srcDir(Callable{generateTask.outputDir})
+
+
+      val cleanTask = project.tasks.create(cleanTaskName) { clean ->
+        clean.description = "Clean the generated source folder"
+        clean.group = BasePlugin.BUILD_GROUP
+        clean.doFirst { project.delete(outputDir) }
+      }
+
+      project.tasks.getByName(sourceSet.compileJavaTaskName).dependsOn.add(generateTask)
+      project.tasks.getByName(sourceSet.getCompileTaskName("kotlin")).dependsOn(generateTask)
+
+      project.afterEvaluate {
+        project.extensions.getByType(IdeaModel::class.java)?.let { ideaModel ->
+          ideaModel.module.generatedSourceDirs.add(project.file(generateTask.outputDir))
+        }
+      }
+
     }
+
+
+
 
 //    project.logger.lifecycle("Welcome to the kotlinsql builder plugin")
   }

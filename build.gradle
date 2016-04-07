@@ -60,19 +60,24 @@ test {
     useTestNG()
 }
 
-generate {
-    def depth = 10
-    databaseFunctions{
-        output = 'gen/DatabaseMethods.kt'
-        generator = new GenerateDatabaseBaseKt(depth)
-    }
-    selects{
-        output = 'gen/selectImpls.kt'
-        generator = new GenerateSelectClasses(depth)
-    }
-    statements{
-        output = 'gen/statementImpls.kt'
-        generator = new GenerateStatementsKt(depth)
+sourceSets {
+    main {
+        generate {
+            def depth = 10
+            databaseFunctions{
+                output = 'gen/DatabaseMethods.kt'
+                generator = new GenerateDatabaseBaseKt(depth)
+            }
+            selects{
+                output = 'gen/selectImpls.kt'
+                generator = new GenerateSelectClasses(depth)
+            }
+            statements{
+                output = 'gen/statementImpls.kt'
+                generator = new GenerateStatementsKt(depth)
+            }
+
+        }
     }
 }
 
