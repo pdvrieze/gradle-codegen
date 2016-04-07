@@ -107,19 +107,28 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
   }
 
 
-  abstract  class WhereClause {
+  abstract class WhereClause:WhereValue() {
 
     open fun setParameters(statementHelper: StatementHelper, first:Int=1):Int = first
 
-    abstract fun toSQL(prefixMap:Map<String,String>?): String
   }
 
-  private class WhereCmpCol<S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>>(val col1:ColumnRef<*,S1,*>, val cmp:SqlComparisons, val col2:ColumnRef<*,S2,*>): WhereClause() {
+  private class WhereCombine(val left:WhereClause, val rel:String, val right:WhereClause):BooleanWhereValue() {
+    override fun toSQL(prefixMap: Map<String, String>?): String {
+      return "( $left $rel $right )"
+    }
+  }
+
+  private class WhereBooleanUnary(val rel:String, val base:WhereClause):BooleanWhereValue() {
+    override fun toSQL(prefixMap: Map<String, String>?)= "$rel $base"
+  }
+
+  private class WhereCmpCol<S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>>(val col1:ColumnRef<*,S1,*>, val cmp:SqlComparisons, val col2:ColumnRef<*,S2,*>): BooleanWhereValue() {
 
     override fun toSQL(prefixMap:Map<String,String>?)= "${col1.name(prefixMap)} $cmp ${col2.name(prefixMap)}"
   }
 
-  private class WhereCmpParam<T:Any>(val ref:ColumnRef<T,*,*>, val cmp:SqlComparisons, val value: T?): WhereClause() {
+  private class WhereCmpParam<T:Any>(val ref:ColumnRef<T,*,*>, val cmp:SqlComparisons, val value: T?): BooleanWhereValue() {
     override fun toSQL(prefixMap:Map<String,String>?) = "`${ref.name}` $cmp ?"
 
     override fun setParameters(statementHelper: StatementHelper, first: Int):Int {
@@ -130,19 +139,35 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
 
   class _Where {
 
-    infix fun <T : Any> ColumnRef<T, *, *>.eq(value: T): WhereClause = WhereCmpParam(this, SqlComparisons.eq, value)
-    infix fun <T : Any> ColumnRef<T, *, *>.ne(value: T): WhereClause = WhereCmpParam(this, SqlComparisons.ne, value)
-    infix fun <T : Any> ColumnRef<T, *, *>.lt(value: T): WhereClause = WhereCmpParam(this, SqlComparisons.lt, value)
-    infix fun <T : Any> ColumnRef<T, *, *>.le(value: T): WhereClause = WhereCmpParam(this, SqlComparisons.le, value)
-    infix fun <T : Any> ColumnRef<T, *, *>.gt(value: T): WhereClause = WhereCmpParam(this, SqlComparisons.gt, value)
-    infix fun <T : Any> ColumnRef<T, *, *>.ge(value: T): WhereClause = WhereCmpParam(this, SqlComparisons.ge, value)
+    infix fun <T : Any> ColumnRef<T, *, *>.eq(value: T): BooleanWhereValue = WhereCmpParam(this, SqlComparisons.eq, value)
+    infix fun <T : Any> ColumnRef<T, *, *>.ne(value: T): BooleanWhereValue = WhereCmpParam(this, SqlComparisons.ne, value)
+    infix fun <T : Any> ColumnRef<T, *, *>.lt(value: T): BooleanWhereValue = WhereCmpParam(this, SqlComparisons.lt, value)
+    infix fun <T : Any> ColumnRef<T, *, *>.le(value: T): BooleanWhereValue = WhereCmpParam(this, SqlComparisons.le, value)
+    infix fun <T : Any> ColumnRef<T, *, *>.gt(value: T): BooleanWhereValue = WhereCmpParam(this, SqlComparisons.gt, value)
+    infix fun <T : Any> ColumnRef<T, *, *>.ge(value: T): BooleanWhereValue = WhereCmpParam(this, SqlComparisons.ge, value)
 
-    infix fun <S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>> ColumnRef<*, S1, *>.eq(other: ColumnRef<*,S2,*>): WhereClause = WhereCmpCol(this, SqlComparisons.eq, other)
-    infix fun <S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>> ColumnRef<*, S1, *>.ne(other: ColumnRef<*,S2,*>): WhereClause = WhereCmpCol(this, SqlComparisons.ne, other)
-    infix fun <S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>> ColumnRef<*, S1, *>.lt(other: ColumnRef<*,S2,*>): WhereClause = WhereCmpCol(this, SqlComparisons.lt, other)
-    infix fun <S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>> ColumnRef<*, S1, *>.le(other: ColumnRef<*,S2,*>): WhereClause = WhereCmpCol(this, SqlComparisons.le, other)
-    infix fun <S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>> ColumnRef<*, S1, *>.gt(other: ColumnRef<*,S2,*>): WhereClause = WhereCmpCol(this, SqlComparisons.gt, other)
-    infix fun <S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>> ColumnRef<*, S1, *>.ge(other: ColumnRef<*,S2,*>): WhereClause = WhereCmpCol(this, SqlComparisons.ge, other)
+    infix fun <S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>> ColumnRef<*, S1, *>.eq(other: ColumnRef<*,S2,*>): BooleanWhereValue = WhereCmpCol(this, SqlComparisons.eq, other)
+    infix fun <S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>> ColumnRef<*, S1, *>.ne(other: ColumnRef<*,S2,*>): BooleanWhereValue = WhereCmpCol(this, SqlComparisons.ne, other)
+    infix fun <S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>> ColumnRef<*, S1, *>.lt(other: ColumnRef<*,S2,*>): BooleanWhereValue = WhereCmpCol(this, SqlComparisons.lt, other)
+    infix fun <S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>> ColumnRef<*, S1, *>.le(other: ColumnRef<*,S2,*>): BooleanWhereValue = WhereCmpCol(this, SqlComparisons.le, other)
+    infix fun <S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>> ColumnRef<*, S1, *>.gt(other: ColumnRef<*,S2,*>): BooleanWhereValue = WhereCmpCol(this, SqlComparisons.gt, other)
+    infix fun <S1 : ColumnType<*,S1,*>, S2 : ColumnType<*,S2,*>> ColumnRef<*, S1, *>.ge(other: ColumnRef<*,S2,*>): BooleanWhereValue = WhereCmpCol(this, SqlComparisons.ge, other)
+
+    infix fun WhereClause.AND(other:WhereClause):WhereClause = WhereCombine(this, "AND", other)
+    infix fun WhereClause.OR(other:WhereClause):WhereClause = WhereCombine(this, "OR", other)
+    infix fun WhereClause.XOR(other:WhereClause):WhereClause = WhereCombine(this, "XOR", other)
+
+    fun NOT(other:WhereClause):WhereClause = WhereBooleanUnary("NOT", other)
+
+    infix fun ColumnRef<*,*,*>.IS(ref:RefWhereValue) = WhereEq(this,"IS",ref)
+    infix fun ColumnRef<*,*,*>.IS_NOT(ref:RefWhereValue) = WhereEq(this,"NOT",ref)
+
+    //    fun ISNOT(other:WhereClause):WhereClause = WhereUnary("NOT", other)
+
+    val TRUE:BooleanWhereValue=object:BooleanWhereValue() { override fun toSQL(prefixMap: Map<String, String>?)= "TRUE" }
+    val FALSE:BooleanWhereValue=object:BooleanWhereValue() { override fun toSQL(prefixMap: Map<String, String>?)= "FALSE" }
+    val UNKNOWN:BooleanWhereValue=object:BooleanWhereValue() { override fun toSQL(prefixMap: Map<String, String>?)= "UNKNOWN" }
+    val NULL:RefWhereValue=object:RefWhereValue() { override fun toSQL(prefixMap: Map<String, String>?)= "NULL" }
   }
 
   interface Statement {
@@ -151,6 +176,14 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
     fun toSQL(): String
   }
 
+  abstract class WhereValue internal constructor() {
+    abstract fun toSQL(prefixMap: Map<String, String>?):String
+  }
+
+  abstract class BooleanWhereValue:WhereClause()
+
+  abstract class RefWhereValue:WhereValue()
+
   abstract class _StatementBase(val where:WhereClause): Statement {
     override fun toSQL(): String {
       val prefixMap = select.createTablePrefixMap()
@@ -158,6 +191,9 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
     }
   }
 
+  class WhereEq(val left:ColumnRef<*,*,*>, val rel:String, val right:RefWhereValue):BooleanWhereValue() {
+    override fun toSQL(prefixMap: Map<String, String>?)="$left $rel $right"
+  }
 
   interface Select:Statement {
     fun createTablePrefixMap(): Map<String, String>?
