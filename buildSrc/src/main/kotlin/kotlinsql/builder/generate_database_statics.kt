@@ -36,19 +36,19 @@ class GenerateDatabaseBaseKt(val count:Int): GenerateImpl {
       appendln("package uk.ac.bournemouth.util.kotlin.sql.impl.gen")
       appendln()
       appendln("import uk.ac.bournemouth.kotlinsql.Column")
-      appendln("import uk.ac.bournemouth.kotlinsql.ColumnType")
+      appendln("import uk.ac.bournemouth.kotlinsql.IColumnType")
       appendln("import uk.ac.bournemouth.kotlinsql.Database")
       appendln()
       appendln("open class DatabaseMethods {")
-      appendln("  companion object {")
+//      appendln("  companion object {")
 
       for(n in 1..count) {
-        appendln("    @JvmStatic")
+//        appendln("    @JvmStatic")
         append("    fun <")
 
         run {
           val indent = " ".repeat(if (n<9) 9 else 10)
-          (1..n).joinToString(",\n${indent}") { m -> "T$m:Any, S$m:ColumnType<T$m,S$m,C$m>, C$m: Column<T$m, S$m, C$m>" }.apply { append(this) }
+          (1..n).joinToString(",\n${indent}") { m -> "T$m:Any, S$m:IColumnType<T$m,S$m,C$m>, C$m: Column<T$m, S$m, C$m>" }.apply { append(this) }
         }
         append("> SELECT(")
         (1..n).joinToString{ m -> "col$m: C$m" }.apply {append(this)}
@@ -62,7 +62,7 @@ class GenerateDatabaseBaseKt(val count:Int): GenerateImpl {
         appendln(")")
         appendln()
       }
-      appendln("  }")
+//      appendln("  }")
       appendln("}")
     }
   }

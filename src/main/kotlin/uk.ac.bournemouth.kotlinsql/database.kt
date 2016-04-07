@@ -25,6 +25,8 @@ import uk.ac.bournemouth.util.kotlin.sql.StatementHelper
 import uk.ac.bournemouth.util.kotlin.sql.connection
 import uk.ac.bournemouth.util.kotlin.sql.impl.gen.DatabaseMethods
 import uk.ac.bournemouth.util.kotlin.sql.impl.gen._Statement1
+import java.sql.ResultSet
+import java.sql.SQLException
 import java.util.*
 import javax.sql.DataSource
 import kotlin.reflect.KClass
@@ -173,7 +175,11 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
   interface Statement {
     val select:Select
 
+    /** Generate the SQL corresponding to the statement.*/
     fun toSQL(): String
+
+    /** Set the parameter values */
+    fun setParams(statementHelper: StatementHelper, first: Int =1)
   }
 
   abstract class WhereValue internal constructor() {
@@ -184,11 +190,59 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
 
   abstract class RefWhereValue:WhereValue()
 
+  abstract class _Statement1Base<T1:Any, S1:IColumnType<T1,S1,C1>, C1: Column<T1, S1, C1>>(override val select:_Select1<T1,S1,C1>, where:WhereClause):_StatementBase(where) {
+
+    /**
+     * Get a single (optional) result
+     */
+    fun getSingle(connection:DBConnection): T1? {
+      return connection.prepareStatement(toSQL()) {
+        setParams(this)
+        execute { rs ->
+          if (rs.next()) {
+            select.col1.type.fromResultSet(rs, 1).apply { if (rs.next()) throw SQLException("Multiple results found, where only one or none expected") }
+          } else {
+            null
+          }
+        }
+      }
+    }
+
+    fun getList(connection:DBConnection): List<T1> {
+      val result=mutableListOf<T1>()
+      executeHelper(connection, Unit) {rs, b -> result.add(select.col1.type.fromResultSet(rs,1))}
+      return result
+
+    }
+
+  }
+
   abstract class _StatementBase(val where:WhereClause): Statement {
     override fun toSQL(): String {
       val prefixMap = select.createTablePrefixMap()
       return "${select.toSQL(prefixMap)} WHERE ${where.toSQL(prefixMap)}"
     }
+
+    override fun setParams(statementHelper: StatementHelper, first: Int) {
+      where.setParameters(statementHelper,first)
+    }
+
+    protected fun <T> executeHelper(connection: DBConnection, block: T, invokeHelper:(ResultSet, T)->Unit):Boolean {
+      return connection.prepareStatement(toSQL()) {
+        setParams(this)
+        execute { rs ->
+          if (rs.next()) {
+            do {
+              invokeHelper(rs, block)
+            } while (rs.next())
+            true
+          } else {
+            false
+          }
+        }
+      }
+    }
+
   }
 
   class WhereEq(val left:ColumnRef<*,*,*>, val rel:String, val right:RefWhereValue):BooleanWhereValue() {
@@ -215,6 +269,10 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
       } else {
         return columns.joinToString("`, `", "SELECT `", "`") { it.name }
       }
+    }
+
+    override fun setParams(statementHelper: StatementHelper, first: Int): Unit {
+      /* No implementation for selects */
     }
 
     private fun tableNames() = columns.map { it.table._name }.toSortedSet()
@@ -270,6 +328,11 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
 
     override fun toSQL(): String = "SELECT `${col1.name}` FROM `${col1.table._name}`"
     override fun toSQL(prefixMap: Map<String, String>?) = toSQL()
+
+    override fun setParams(statementHelper: StatementHelper, first: Int): Unit {
+      /* No implementation for selects */
+    }
+
   }
 
 }

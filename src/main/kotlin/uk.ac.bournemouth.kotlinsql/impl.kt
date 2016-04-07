@@ -25,7 +25,7 @@ import uk.ac.bournemouth.kotlinsql.ColumnType.*
 import uk.ac.bournemouth.kotlinsql.AbstractColumnConfiguration.*
 import uk.ac.bournemouth.kotlinsql.AbstractColumnConfiguration.AbstractNumberColumnConfiguration.*
 import uk.ac.bournemouth.kotlinsql.AbstractColumnConfiguration.AbstractCharColumnConfiguration.*
-
+import java.math.BigDecimal
 
 
 internal val LINE_SEPARATOR: String by lazy { System.getProperty("line.separator")!! }
@@ -143,8 +143,8 @@ internal class NumberColumnImpl<T:Any, S: NumericColumnType<T, S>>(name:String, 
 }
 
 
-internal class CharColumnImpl<T:Any, S: CharColumnType<T, S>>(name:String, configuration: CharColumnConfiguration<T, S>):
-      ColumnImpl<T, S, CharColumn<T, S>> (table = configuration.table,
+internal class CharColumnImpl<T:Any, S: CharColumnType<S>>(name:String, configuration: CharColumnConfiguration<S>):
+      ColumnImpl<String, S, CharColumn<S>> (table = configuration.table,
                                           type = configuration.type,
                                           name = name,
                                           notnull = configuration.notnull,
@@ -157,13 +157,13 @@ internal class CharColumnImpl<T:Any, S: CharColumnType<T, S>>(name:String, confi
                                           references = configuration.references,
                                           binary = configuration.binary,
                                           charset = configuration.charset,
-                                          collation = configuration.collation), CharColumn<T, S> {
-  override fun copyConfiguration(newName:String?, owner: Table) = CharColumnConfiguration(owner, newName ?: name, type)
+                                          collation = configuration.collation), CharColumn<S> {
+  override fun copyConfiguration(newName:String?, owner: Table) = CharColumnConfiguration<S>(owner, newName ?: name, type)
 }
 
 
-internal class LengthCharColumnImpl<T:Any, S: LengthCharColumnType<T, S>>(name:String, configuration: LengthCharColumnConfiguration<T, S>):
-      ColumnImpl<T, S, LengthCharColumn<T, S>> (table = configuration.table,
+internal class LengthCharColumnImpl<T:Any, S: LengthCharColumnType<S>>(name:String, configuration: LengthCharColumnConfiguration<S>):
+      ColumnImpl<String, S, LengthCharColumn<S>> (table = configuration.table,
                                                 type = configuration.type,
                                                 name = name,
                                                 notnull = configuration.notnull,
@@ -177,13 +177,13 @@ internal class LengthCharColumnImpl<T:Any, S: LengthCharColumnType<T, S>>(name:S
                                                 length = configuration.length,
                                                 binary = configuration.binary,
                                                 charset = configuration.charset,
-                                                collation = configuration.collation), LengthCharColumn<T, S> {
+                                                collation = configuration.collation), LengthCharColumn<S> {
   override fun copyConfiguration(newName:String?, owner: Table) = LengthCharColumnConfiguration(owner, newName ?: name, type, length)
 }
 
 
-internal class DecimalColumnImpl<T:Any, S: DecimalColumnType<T, S>>(name:String, configuration: DecimalColumnConfiguration<T, S>):
-      ColumnImpl<T, S, DecimalColumn<T, S>> (table = configuration.table,
+internal class DecimalColumnImpl<S: DecimalColumnType<S>>(name:String, configuration: DecimalColumnConfiguration<S>):
+      ColumnImpl<BigDecimal, S, DecimalColumn<S>> (table = configuration.table,
                                              type = configuration.type,
                                              name = name,
                                              notnull = configuration.notnull,
@@ -198,7 +198,7 @@ internal class DecimalColumnImpl<T:Any, S: DecimalColumnType<T, S>>(name:String,
                                              zerofill = configuration.zerofill,
                                              displayLength = configuration.displayLength,
                                              precision = configuration.precision,
-                                             scale = configuration.scale), DecimalColumn<T,S> {
+                                             scale = configuration.scale), DecimalColumn<S> {
   override fun copyConfiguration(newName:String?, owner: Table) = DecimalColumnConfiguration(owner, newName ?: name, type, precision, scale)
 }
 

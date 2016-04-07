@@ -48,7 +48,7 @@ class GenerateSelectClasses(val count:Int):GenerateImpl {
         append("):\n      _BaseSelect(")
         append((1..n).joinToString { m -> "col$m" })
         appendln("){")
-        appendln("    override fun WHERE(config: _Where.() -> WhereClause): Statement =")
+        appendln("    override fun WHERE(config: _Where.() -> WhereClause) =")
         appendln("        _Statement$n(this, _Where().config())")
         appendln("}")
 

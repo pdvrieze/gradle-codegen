@@ -37,18 +37,53 @@ class GenerateStatementsKt(val count:Int):GenerateImpl {
       appendln("package uk.ac.bournemouth.util.kotlin.sql.impl.gen")
       appendln()
       appendln("import uk.ac.bournemouth.kotlinsql.Column")
-      appendln("import uk.ac.bournemouth.kotlinsql.Database")
+//      appendln("import uk.ac.bournemouth.kotlinsql.Database")
       appendln("import uk.ac.bournemouth.kotlinsql.Database.*")
       appendln("import uk.ac.bournemouth.kotlinsql.IColumnType")
+      appendln("import uk.ac.bournemouth.util.kotlin.sql.DBConnection")
 
       for (n in 1..count) {
         appendln()
         append("class _Statement$n<")
         (1..n).joinToString(",\n                  ") { m -> "T$m:Any, S$m:IColumnType<T$m,S$m,C$m>, C$m: Column<T$m, S$m, C$m>" }.apply { append(this) }
-        append(">(override val select:_Select$n<")
+        append(">(${if (n==1) "" else "override val "}select:_Select$n<")
         (1..n).joinToString(",") { m -> "T$m,S$m,C$m" }.apply { append(this) }
-        appendln(">, where:WhereClause):_StatementBase(where)")
+        when(n) {
+          1    -> appendln(">, where:WhereClause):_Statement1Base<T1,S1,C1>(select,where) {")
+          else -> appendln(">, where:WhereClause):_StatementBase(where) {")
+        }
         appendln()
+        appendln("  @Suppress(\"UNCHECKED_CAST\")")
+        append("  fun execute(connection:DBConnection, block: (")
+        (1..n).joinToString(",") {m -> "T$m"}.apply { append(this) }
+        appendln(")->Unit):Boolean {")
+        appendln("    return executeHelper(connection, block) { rs, block ->")
+        append("      block(")
+        if (n==1) {
+          append("select.col1.type.fromResultSet(rs, 1)")
+        } else {
+          (1..n).joinToString(",\n${" ".repeat(12)}") { m -> "(select.columns[$m] as C$m).type.fromResultSet(rs, $m)" }.apply { append(this) }
+        }
+        appendln(')')
+        appendln("    }")
+        appendln("  }")
+        appendln()
+
+        append("  fun <R>getList(connection: DBConnection, factory:(")
+        (1..n).joinToString(",") { "T$it" }.apply { append(this) }
+        appendln(")->R): List<R> {")
+        appendln("    val result=mutableListOf<R>()")
+        append("    execute(connection) { ")
+        (1..n).joinToString { "p$it" }.apply { append(this) }
+        append(" -> result.add(factory(")
+        (1..n).joinToString { "p$it" }.apply { append(this) }
+        appendln(")) }")
+        appendln("    return result")
+        appendln("  }")
+
+        appendln()
+
+        appendln("}")
       }
     }
   }

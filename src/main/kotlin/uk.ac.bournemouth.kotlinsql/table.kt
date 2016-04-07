@@ -56,12 +56,6 @@ interface Table:TableRef {
 
   fun appendDDL(appendable: Appendable)
 
-  fun <T:Any, S:ColumnType<T,S,C>, C: Column<T, S,C>> SELECT(col1: C)= DatabaseMethods.SELECT(col1)
-
-  fun <T1 :Any, S1 :ColumnType<T1, S1, C1>, C1 : Column<T1, S1, C1>,
-       T2 :Any, S2 :ColumnType<T2, S2, C2>, C2 : Column<T2, S2, C2>
-        > SELECT(col1: C1, col2: C2)= DatabaseMethods.SELECT(col1, col2)
-
 }
 
 operator fun Table.get(name:String) = this.column(name) ?: throw NoSuchElementException("The column with the name ${name} does not exist")

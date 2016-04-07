@@ -38,6 +38,7 @@ import uk.ac.bournemouth.util.kotlin.sql.DBConnection
 import uk.ac.bournemouth.util.kotlin.sql.connection
 import java.math.BigDecimal
 import java.sql.Date
+import java.sql.ResultSet
 import java.sql.Time
 import java.sql.Timestamp
 import java.util.*
@@ -74,6 +75,8 @@ interface IColumnType<T:Any, S: IColumnType<T, S, C>, C:Column<T,S,C>> {
   fun cast(value: Any): T
 
   fun newConfiguration(owner: Table, refColumn: C): AbstractColumnConfiguration<T,S, C, out Any>
+
+  fun fromResultSet(rs: ResultSet, pos: Int): T
 }
 
 sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(override val typeName:String, override val type: KClass<T>): IColumnType<T,S,C> {
@@ -95,62 +98,103 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(override
   interface INumericColumnType<T:Any, S:INumericColumnType<T,S,C>, C:INumericColumn<T,S,C>>: IColumnType<T,S,C>
 
   sealed class NumericColumnType<T:Any, S: NumericColumnType<T, S>>(typeName: String, type: KClass<T>):ColumnType<T,S, NumericColumn<T,S>>(typeName, type), INumericColumnType<T,S, NumericColumn<T,S>> {
-    object TINYINT_T   : NumericColumnType<Byte, TINYINT_T>("BIGINT", Byte::class)
-    object SMALLINT_T  : NumericColumnType<Short, SMALLINT_T>("SMALLINT", Short::class)
-    object MEDIUMINT_T : NumericColumnType<Int, MEDIUMINT_T>("MEDIUMINT", Int::class)
-    object INT_T       : NumericColumnType<Int, INT_T>("INT", Int::class)
-    object BIGINT_T    : NumericColumnType<Long, BIGINT_T>("BIGINT", Long::class)
+    object TINYINT_T   : NumericColumnType<Byte, TINYINT_T>("BIGINT", Byte::class){
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getByte(pos)
+    }
+    object SMALLINT_T  : NumericColumnType<Short, SMALLINT_T>("SMALLINT", Short::class){
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getShort(pos)
+    }
+    object MEDIUMINT_T : NumericColumnType<Int, MEDIUMINT_T>("MEDIUMINT", Int::class){
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getInt(pos)
+    }
+    object INT_T       : NumericColumnType<Int, INT_T>("INT", Int::class){
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getInt(pos)
+    }
+    object BIGINT_T    : NumericColumnType<Long, BIGINT_T>("BIGINT", Long::class){
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getLong(pos)
+    }
 
-    object FLOAT_T     : NumericColumnType<Float, FLOAT_T>("FLOAT", Float::class)
-    object DOUBLE_T    : NumericColumnType<Double, DOUBLE_T>("DOUBLE", Double::class)
+    object FLOAT_T     : NumericColumnType<Float, FLOAT_T>("FLOAT", Float::class){
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getFloat(pos)
+    }
+    object DOUBLE_T    : NumericColumnType<Double, DOUBLE_T>("DOUBLE", Double::class){
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getDouble(pos)
+    }
 
     override fun newConfiguration(owner: Table, refColumn: NumericColumn<T,S>)=
           NumberColumnConfiguration(owner, refColumn.name, this as S)
 
   }
 
-  sealed class DecimalColumnType<T:Any, S:DecimalColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, DecimalColumn<T,S>>(typeName, type), INumericColumnType<T,S, DecimalColumn<T,S>> {
+  sealed class DecimalColumnType<S:DecimalColumnType<S>>(typeName: String, type: KClass<BigDecimal>):ColumnType<BigDecimal,S, DecimalColumn<S>>(typeName, type), INumericColumnType<BigDecimal,S, DecimalColumn<S>> {
+    override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getBigDecimal(pos)
 
-    object DECIMAL_T   : DecimalColumnType<BigDecimal, DECIMAL_T>("DECIMAL", BigDecimal::class)
-    object NUMERIC_T   : DecimalColumnType<BigDecimal, NUMERIC_T>("NUMERIC", BigDecimal::class)
+    object DECIMAL_T   : DecimalColumnType<DECIMAL_T>("DECIMAL", BigDecimal::class)
+    object NUMERIC_T   : DecimalColumnType<NUMERIC_T>("NUMERIC", BigDecimal::class)
 
-    override fun newConfiguration(owner: Table, refColumn: DecimalColumn<T,S>):DecimalColumnConfiguration<T,S> {
-      refColumn as DecimalColumn<T,S>
+    override fun newConfiguration(owner: Table, refColumn: DecimalColumn<S>):DecimalColumnConfiguration<S> {
+      refColumn as DecimalColumn<S>
       return DecimalColumnConfiguration(owner, refColumn.name, this as S, refColumn.precision, refColumn.scale)
     }
   }
 
   sealed class SimpleColumnType<T:Any, S:SimpleColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, SimpleColumn<T,S>>(typeName, type) {
 
-    object BIT_T       : SimpleColumnType<Boolean, BIT_T>("BIT", Boolean::class), BoundedType { override val maxLen = 64 }
+    object BIT_T       : SimpleColumnType<Boolean, BIT_T>("BIT", Boolean::class), BoundedType {
+      override val maxLen = 64
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getBoolean(pos)
+    }
 
-    object DATE_T      : SimpleColumnType<java.sql.Date, DATE_T>("DATE", java.sql.Date::class)
-    object TIME_T      : SimpleColumnType<java.sql.Time, TIME_T>("TIME", java.sql.Time::class)
-    object TIMESTAMP_T : SimpleColumnType<java.sql.Timestamp, TIMESTAMP_T>("TIMESTAMP", java.sql.Timestamp::class)
-    object DATETIME_T  : SimpleColumnType<java.sql.Timestamp, DATETIME_T>("TIMESTAMP", java.sql.Timestamp::class)
-    object YEAR_T      : SimpleColumnType<java.sql.Date, YEAR_T>("YEAR", java.sql.Date::class)
+    object DATE_T      : SimpleColumnType<java.sql.Date, DATE_T>("DATE", java.sql.Date::class){
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getDate(pos)
+    }
+    object TIME_T      : SimpleColumnType<java.sql.Time, TIME_T>("TIME", java.sql.Time::class){
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getTime(pos)
+    }
+    object TIMESTAMP_T : SimpleColumnType<java.sql.Timestamp, TIMESTAMP_T>("TIMESTAMP", java.sql.Timestamp::class){
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getTimestamp(pos)
+    }
+    object DATETIME_T  : SimpleColumnType<java.sql.Timestamp, DATETIME_T>("TIMESTAMP", java.sql.Timestamp::class){
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getTimestamp(pos)
+    }
+    object YEAR_T      : SimpleColumnType<java.sql.Date, YEAR_T>("YEAR", java.sql.Date::class){
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getDate(pos)
+    }
 
-    object TINYBLOB_T  : SimpleColumnType<ByteArray, TINYBLOB_T>("TINYBLOB", ByteArray::class), BoundedType { override val maxLen = 255 }
-    object BLOB_T      : SimpleColumnType<ByteArray, BLOB_T>("BLOB", ByteArray::class), BoundedType { override val maxLen = 0xffff }
-    object MEDIUMBLOB_T: SimpleColumnType<ByteArray, MEDIUMBLOB_T>("MEDIUMBLOB", ByteArray::class), BoundedType { override val maxLen = 0xffffff }
-    object LONGBLOB_T  : SimpleColumnType<ByteArray, LONGBLOB_T>("LONGBLOB", ByteArray::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
+    object TINYBLOB_T  : SimpleColumnType<ByteArray, TINYBLOB_T>("TINYBLOB", ByteArray::class), BoundedType {
+      override val maxLen = 255
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getBytes(pos)
+    }
+    object BLOB_T      : SimpleColumnType<ByteArray, BLOB_T>("BLOB", ByteArray::class), BoundedType {
+      override val maxLen = 0xffff
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getBytes(pos)
+    }
+    object MEDIUMBLOB_T: SimpleColumnType<ByteArray, MEDIUMBLOB_T>("MEDIUMBLOB", ByteArray::class), BoundedType {
+      override val maxLen = 0xffffff
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getBytes(pos)
+    }
+    object LONGBLOB_T  : SimpleColumnType<ByteArray, LONGBLOB_T>("LONGBLOB", ByteArray::class), BoundedType {
+      override val maxLen = Int.MAX_VALUE /*Actually it would be more*/
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getBytes(pos)
+    }
 
     override fun newConfiguration(owner: Table, refColumn: SimpleColumn<T,S>) =
           NormalColumnConfiguration(owner, refColumn.name, this as S)
 
   }
 
-  interface ICharColumnType<T:Any, S:ICharColumnType<T,S, C>, C:ICharColumn<T,S, C>>: IColumnType<T,S,C>
+  interface ICharColumnType<S:ICharColumnType<S, C>, C:ICharColumn<String,S, C>>: IColumnType<String,S,C>
 
-  sealed class CharColumnType<T:Any, S:CharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, CharColumn<T,S>>(typeName, type), ICharColumnType<T,S, CharColumn<T,S>> {
+  sealed class CharColumnType<S:CharColumnType<S>>(typeName: String, type: KClass<String>):ColumnType<String,S, CharColumn<S>>(typeName, type), ICharColumnType<S, CharColumn<S>> {
+    override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getString(pos)
 
-    object TINYTEXT_T  : CharColumnType<String, TINYTEXT_T>("TINYTEXT", String::class), BoundedType { override val maxLen = 255 }
-    object TEXT_T      : CharColumnType<String, TEXT_T>("TEXT", String::class), BoundedType { override val maxLen = 0xffff }
-    object MEDIUMTEXT_T: CharColumnType<String, MEDIUMTEXT_T>("MEDIUMTEXT", String::class), BoundedType { override val maxLen = 0xffffff }
-    object LONGTEXT_T  : CharColumnType<String, LONGTEXT_T>("LONGTEXT", String::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
+    object TINYTEXT_T  : CharColumnType<TINYTEXT_T>("TINYTEXT", String::class), BoundedType { override val maxLen = 255 }
+    object TEXT_T      : CharColumnType<TEXT_T>("TEXT", String::class), BoundedType { override val maxLen = 0xffff }
+    object MEDIUMTEXT_T: CharColumnType<MEDIUMTEXT_T>("MEDIUMTEXT", String::class), BoundedType { override val maxLen = 0xffffff }
+    object LONGTEXT_T  : CharColumnType<LONGTEXT_T>("LONGTEXT", String::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
 
     @Suppress("UNCHECKED_CAST")
-    override fun newConfiguration(owner: Table, refColumn: CharColumn<T,S>) =
+    override fun newConfiguration(owner: Table, refColumn: CharColumn<S>) =
           CharColumnConfiguration(owner, refColumn.name, this as S)
 
   }
@@ -159,10 +203,19 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(override
 
   sealed class LengthColumnType<T:Any, S:LengthColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthColumn<T,S>>(typeName, type), ILengthColumnType<T,S, LengthColumn<T,S>> {
 
-    object BITFIELD_T  : LengthColumnType<Array<Boolean>, BITFIELD_T>("BIT", Array<Boolean>::class)
+    object BITFIELD_T  : LengthColumnType<BooleanArray, BITFIELD_T>("BIT", BooleanArray::class) {
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getArray(pos) as BooleanArray
 
-    object BINARY_T    : LengthColumnType<ByteArray, BINARY_T>("BINARY", ByteArray::class), BoundedType { override val maxLen = 255 }
-    object VARBINARY_T : LengthColumnType<ByteArray, VARBINARY_T>("VARBINARY", ByteArray::class), BoundedType { override val maxLen = 0xffff }
+    }
+
+    object BINARY_T    : LengthColumnType<ByteArray, BINARY_T>("BINARY", ByteArray::class), BoundedType {
+      override val maxLen = 255
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getBytes(pos)
+    }
+    object VARBINARY_T : LengthColumnType<ByteArray, VARBINARY_T>("VARBINARY", ByteArray::class), BoundedType {
+      override val maxLen = 0xffff
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getBytes(pos)
+    }
 
     @Suppress("UNCHECKED_CAST")
     override fun newConfiguration(owner: Table, refColumn: LengthColumn<T,S>) =
@@ -170,13 +223,15 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(override
 
   }
 
-  sealed class LengthCharColumnType<T:Any, S:LengthCharColumnType<T,S>>(typeName: String, type: KClass<T>):ColumnType<T,S, LengthCharColumn<T,S>>(typeName, type), ILengthColumnType<T,S,LengthCharColumn<T,S>>, ICharColumnType<T,S,LengthCharColumn<T,S>> {
+  sealed class LengthCharColumnType<S:LengthCharColumnType<S>>(typeName: String, type: KClass<String>):ColumnType<String,S, LengthCharColumn<S>>(typeName, type), ILengthColumnType<String,S,LengthCharColumn<S>>, ICharColumnType<S,LengthCharColumn<S>> {
 
-    object CHAR_T      : LengthCharColumnType<String, CHAR_T>("CHAR", String::class), BoundedType { override val maxLen = 255 }
-    object VARCHAR_T   : LengthCharColumnType<String, VARCHAR_T>("VARCHAR", String::class), BoundedType { override val maxLen = 0xffff }
+    object CHAR_T      : LengthCharColumnType<CHAR_T>("CHAR", String::class), BoundedType { override val maxLen = 255 }
+    object VARCHAR_T   : LengthCharColumnType<VARCHAR_T>("VARCHAR", String::class), BoundedType { override val maxLen = 0xffff }
 
-    override fun newConfiguration(owner: Table, refColumn: LengthCharColumn<T,S>) =
+    override fun newConfiguration(owner: Table, refColumn: LengthCharColumn<S>) =
           LengthCharColumnConfiguration(owner, refColumn.name, this as S, (refColumn as LengthCharColumn).length)
+
+    override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getString(pos)
 
   }
 
@@ -223,27 +278,27 @@ interface NumericColumn<T:Any, S: NumericColumnType<T, S>>: INumericColumn<T,S, 
   override fun copyConfiguration(newName:String?, owner: Table): NumberColumnConfiguration<T,S>
 }
 
-interface ICharColumn<T:Any, S: ICharColumnType<T, S, C>, C:ICharColumn<T,S,C>>: Column<T, S, C> {
+interface ICharColumn<T:Any, S: ICharColumnType<S, C>, C:ICharColumn<String,S,C>>: Column<String, S, C> {
   val charset: String?
   val collation: String?
   val binary: Boolean
 
 }
 
-interface CharColumn<T:Any, S: CharColumnType<T, S>>: ICharColumn<T, S, CharColumn<T,S>> {
-  override fun copyConfiguration(newName:String?, owner: Table): CharColumnConfiguration<T,S>
+interface CharColumn<S: CharColumnType<S>>: ICharColumn<String, S, CharColumn<S>> {
+  override fun copyConfiguration(newName:String?, owner: Table): CharColumnConfiguration<S>
 }
 
 
-interface LengthCharColumn<T:Any, S: LengthCharColumnType<T, S>>: ICharColumn<T, S, LengthCharColumn<T,S>>, ILengthColumn<T, S, LengthCharColumn<T,S>> {
-  override fun copyConfiguration(newName:String?, owner: Table): LengthCharColumnConfiguration<T,S>
+interface LengthCharColumn<S: LengthCharColumnType<S>>: ICharColumn<String, S, LengthCharColumn<S>>, ILengthColumn<String, S, LengthCharColumn<S>> {
+  override fun copyConfiguration(newName:String?, owner: Table): LengthCharColumnConfiguration<S>
 }
 
 
-interface DecimalColumn<T:Any, S: DecimalColumnType<T, S>>: INumericColumn<T, S, DecimalColumn<T,S>> {
+interface DecimalColumn<S: DecimalColumnType<S>>: INumericColumn<BigDecimal, S, DecimalColumn<S>> {
   val precision:Int
   val scale:Int
-  override fun copyConfiguration(newName:String?, owner: Table): DecimalColumnConfiguration<T,S>
+  override fun copyConfiguration(newName:String?, owner: Table): DecimalColumnConfiguration<S>
 }
 
 
@@ -285,7 +340,7 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
   // @formatter:off
   /* Versions with configuration closure. */
   fun BIT(name:String, block: NormalColumnConfiguration<Boolean, BIT_T>.() -> Unit) = NormalColumnConfiguration( this, name, BIT_T).add(block)
-  fun BIT(name:String, length:Int, block: BaseLengthColumnConfiguration<Array<Boolean>, BITFIELD_T, LengthColumn<Array<Boolean>,BITFIELD_T>>.() -> Unit) = LengthColumnConfiguration( this, name, BITFIELD_T, length).add( block)
+  fun BIT(name:String, length:Int, block: BaseLengthColumnConfiguration<BooleanArray, BITFIELD_T, LengthColumn<BooleanArray,BITFIELD_T>>.() -> Unit) = LengthColumnConfiguration( this, name, BITFIELD_T, length).add( block)
   fun TINYINT(name: String, block: NumberColumnConfiguration<Byte, TINYINT_T>.() -> Unit) = NumberColumnConfiguration( this, name, TINYINT_T).add( block)
   fun SMALLINT(name: String, block: NumberColumnConfiguration<Short, SMALLINT_T>.() -> Unit) = NumberColumnConfiguration( this, name, SMALLINT_T).add( block)
   fun MEDIUMINT(name: String, block: NumberColumnConfiguration<Int, MEDIUMINT_T>.() -> Unit) = NumberColumnConfiguration( this, name, MEDIUMINT_T).add( block)
@@ -293,25 +348,25 @@ class TableConfiguration(override val _name:String, val extra:String?=null):Tabl
   fun BIGINT(name: String, block: NumberColumnConfiguration<Long, BIGINT_T>.() -> Unit) = NumberColumnConfiguration( this, name, BIGINT_T).add( block)
   fun FLOAT(name: String, block: NumberColumnConfiguration<Float, FLOAT_T>.() -> Unit) = NumberColumnConfiguration( this, name, FLOAT_T).add( block)
   fun DOUBLE(name: String, block: NumberColumnConfiguration<Double, DOUBLE_T>.() -> Unit) = NumberColumnConfiguration( this, name, DOUBLE_T).add( block)
-  fun DECIMAL(name: String, precision: Int = -1, scale: Int = -1, block: DecimalColumnConfiguration<BigDecimal, DECIMAL_T>.() -> Unit) = DecimalColumnConfiguration( this, name, DECIMAL_T, precision, scale).add( block)
-  fun NUMERIC(name: String, precision: Int = -1, scale: Int = -1, block: DecimalColumnConfiguration<BigDecimal, NUMERIC_T>.() -> Unit) = DecimalColumnConfiguration( this, name, NUMERIC_T, precision, scale).add( block)
+  fun DECIMAL(name: String, precision: Int = -1, scale: Int = -1, block: DecimalColumnConfiguration<DECIMAL_T>.() -> Unit) = DecimalColumnConfiguration( this, name, DECIMAL_T, precision, scale).add( block)
+  fun NUMERIC(name: String, precision: Int = -1, scale: Int = -1, block: DecimalColumnConfiguration<NUMERIC_T>.() -> Unit) = DecimalColumnConfiguration( this, name, NUMERIC_T, precision, scale).add( block)
   fun DATE(name: String, block: NormalColumnConfiguration<Date, DATE_T>.() -> Unit) = NormalColumnConfiguration( this, name, DATE_T).add( block)
   fun TIME(name: String, block: NormalColumnConfiguration<Time, TIME_T>.() -> Unit) = NormalColumnConfiguration( this, name, TIME_T).add( block)
   fun TIMESTAMP(name: String, block: NormalColumnConfiguration<Timestamp, TIMESTAMP_T>.() -> Unit) = NormalColumnConfiguration( this, name, TIMESTAMP_T).add( block)
   fun DATETIME(name: String, block: NormalColumnConfiguration<Timestamp, DATETIME_T>.() -> Unit) = NormalColumnConfiguration( this, name, DATETIME_T).add( block)
   fun YEAR(name: String, block: NormalColumnConfiguration<Date, YEAR_T>.() -> Unit) = NormalColumnConfiguration( this, name, YEAR_T).add( block)
-  fun CHAR(name: String, length: Int = -1, block: LengthCharColumnConfiguration<String, CHAR_T>.() -> Unit) = LengthCharColumnConfiguration( this, name, CHAR_T, length).add( block)
-  fun VARCHAR(name: String, length: Int, block: LengthCharColumnConfiguration<String, VARCHAR_T>.() -> Unit) = LengthCharColumnConfiguration( this, name, VARCHAR_T, length).add( block)
+  fun CHAR(name: String, length: Int = -1, block: LengthCharColumnConfiguration<CHAR_T>.() -> Unit) = LengthCharColumnConfiguration( this, name, CHAR_T, length).add( block)
+  fun VARCHAR(name: String, length: Int, block: LengthCharColumnConfiguration<VARCHAR_T>.() -> Unit) = LengthCharColumnConfiguration( this, name, VARCHAR_T, length).add( block)
   fun BINARY(name: String, length: Int, block: BaseLengthColumnConfiguration<ByteArray, BINARY_T, LengthColumn<ByteArray, BINARY_T>>.() -> Unit) = LengthColumnConfiguration( this, name, BINARY_T, length).add( block)
   fun VARBINARY(name: String, length: Int, block: BaseLengthColumnConfiguration<ByteArray, VARBINARY_T, LengthColumn<ByteArray, VARBINARY_T>>.() -> Unit) = LengthColumnConfiguration( this, name, VARBINARY_T, length).add( block)
   fun TINYBLOB(name: String, block: NormalColumnConfiguration<ByteArray, TINYBLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, TINYBLOB_T).add( block)
   fun BLOB(name: String, block: NormalColumnConfiguration<ByteArray, BLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, BLOB_T).add( block)
   fun MEDIUMBLOB(name: String, block: NormalColumnConfiguration<ByteArray, MEDIUMBLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, MEDIUMBLOB_T).add( block)
   fun LONGBLOB(name: String, block: NormalColumnConfiguration<ByteArray, LONGBLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, LONGBLOB_T).add( block)
-  fun TINYTEXT(name: String, block: CharColumnConfiguration<String, TINYTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, TINYTEXT_T).add( block)
-  fun TEXT(name: String, block: CharColumnConfiguration<String, TEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, TEXT_T).add( block)
-  fun MEDIUMTEXT(name: String, block: CharColumnConfiguration<String, MEDIUMTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, MEDIUMTEXT_T).add( block)
-  fun LONGTEXT(name: String, block: CharColumnConfiguration<String, LONGTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, LONGTEXT_T).add( block)
+  fun TINYTEXT(name: String, block: CharColumnConfiguration<TINYTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, TINYTEXT_T).add( block)
+  fun TEXT(name: String, block: CharColumnConfiguration<TEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, TEXT_T).add( block)
+  fun MEDIUMTEXT(name: String, block: CharColumnConfiguration<MEDIUMTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, MEDIUMTEXT_T).add( block)
+  fun LONGTEXT(name: String, block: CharColumnConfiguration<LONGTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, LONGTEXT_T).add( block)
 
   /* Versions without configuration closure */
   fun BIT(name: String) = NormalColumnConfiguration(this, name, BIT_T).add({})

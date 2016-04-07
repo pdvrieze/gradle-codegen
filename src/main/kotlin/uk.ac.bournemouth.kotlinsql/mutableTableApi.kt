@@ -117,7 +117,7 @@ abstract class MutableTable private constructor(name: String?,
 
   // @formatter:off
   protected fun BIT(name:String, block: NormalColumnConfiguration<Boolean, BIT_T>.() -> Unit) = NormalColumnConfiguration( this, name, BIT_T).add( block)
-  protected fun BIT(name: String, length: Int, block: BaseLengthColumnConfiguration<Array<Boolean>, BITFIELD_T, LengthColumn<Array<Boolean>, BITFIELD_T>>.() -> Unit) = LengthColumnConfiguration( this, name, BITFIELD_T, length).add( block)
+  protected fun BIT(name: String, length: Int, block: BaseLengthColumnConfiguration<BooleanArray, BITFIELD_T, LengthColumn<BooleanArray, BITFIELD_T>>.() -> Unit) = LengthColumnConfiguration( this, name, BITFIELD_T, length).add( block)
   protected fun TINYINT(name: String, block: NumberColumnConfiguration<Byte, TINYINT_T>.() -> Unit) = NumberColumnConfiguration( this, name, TINYINT_T).add( block)
   protected fun SMALLINT(name: String, block: NumberColumnConfiguration<Short, SMALLINT_T>.() -> Unit) = NumberColumnConfiguration( this, name, SMALLINT_T).add( block)
   protected fun MEDIUMINT(name: String, block: NumberColumnConfiguration<Int, MEDIUMINT_T>.() -> Unit) = NumberColumnConfiguration( this, name, MEDIUMINT_T).add( block)
@@ -125,25 +125,25 @@ abstract class MutableTable private constructor(name: String?,
   protected fun BIGINT(name: String, block: NumberColumnConfiguration<Long, BIGINT_T>.() -> Unit) = NumberColumnConfiguration( this, name, BIGINT_T).add( block)
   protected fun FLOAT(name: String, block: NumberColumnConfiguration<Float, FLOAT_T>.() -> Unit) = NumberColumnConfiguration( this, name, FLOAT_T).add( block)
   protected fun DOUBLE(name: String, block: NumberColumnConfiguration<Double, DOUBLE_T>.() -> Unit) = NumberColumnConfiguration( this, name, DOUBLE_T).add( block)
-  protected fun DECIMAL(name: String, precision: Int = -1, scale: Int = -1, block: DecimalColumnConfiguration<BigDecimal, DECIMAL_T>.() -> Unit) = DecimalColumnConfiguration( this, name, DECIMAL_T, precision, scale).add( block)
-  protected fun NUMERIC(name: String, precision: Int = -1, scale: Int = -1, block: DecimalColumnConfiguration<BigDecimal, NUMERIC_T>.() -> Unit) = DecimalColumnConfiguration( this, name, NUMERIC_T, precision, scale).add( block)
+  protected fun DECIMAL(name: String, precision: Int = -1, scale: Int = -1, block: DecimalColumnConfiguration<DECIMAL_T>.() -> Unit) = DecimalColumnConfiguration( this, name, DECIMAL_T, precision, scale).add( block)
+  protected fun NUMERIC(name: String, precision: Int = -1, scale: Int = -1, block: DecimalColumnConfiguration<NUMERIC_T>.() -> Unit) = DecimalColumnConfiguration( this, name, NUMERIC_T, precision, scale).add( block)
   protected fun DATE(name: String, block: NormalColumnConfiguration<Date, DATE_T>.() -> Unit) = NormalColumnConfiguration( this, name, DATE_T).add( block)
   protected fun TIME(name: String, block: NormalColumnConfiguration<Time, TIME_T>.() -> Unit) = NormalColumnConfiguration( this, name, TIME_T).add( block)
   protected fun TIMESTAMP(name: String, block: NormalColumnConfiguration<Timestamp, TIMESTAMP_T>.() -> Unit) = NormalColumnConfiguration( this, name, TIMESTAMP_T).add( block)
   protected fun DATETIME(name: String, block: NormalColumnConfiguration<Timestamp, DATETIME_T>.() -> Unit) = NormalColumnConfiguration( this, name, DATETIME_T).add( block)
   protected fun YEAR(name: String, block: NormalColumnConfiguration<Date, YEAR_T>.() -> Unit) = NormalColumnConfiguration( this, name, YEAR_T).add( block)
-  protected fun CHAR(name: String, length: Int = -1, block: LengthCharColumnConfiguration<String, CHAR_T>.() -> Unit) = LengthCharColumnConfiguration( this, name, CHAR_T, length).add( block)
-  protected fun VARCHAR(name: String, length: Int, block: LengthCharColumnConfiguration<String, VARCHAR_T>.() -> Unit) = LengthCharColumnConfiguration( this, name, VARCHAR_T, length).add( block)
+  protected fun CHAR(name: String, length: Int = -1, block: LengthCharColumnConfiguration<CHAR_T>.() -> Unit) = LengthCharColumnConfiguration( this, name, CHAR_T, length).add( block)
+  protected fun VARCHAR(name: String, length: Int, block: LengthCharColumnConfiguration<VARCHAR_T>.() -> Unit) = LengthCharColumnConfiguration( this, name, VARCHAR_T, length).add( block)
   protected fun BINARY(name: String, length: Int, block: BaseLengthColumnConfiguration<ByteArray, BINARY_T, LengthColumn<ByteArray, BINARY_T>>.() -> Unit) = LengthColumnConfiguration( this, name, BINARY_T, length).add( block)
   protected fun VARBINARY(name: String, length: Int, block: BaseLengthColumnConfiguration<ByteArray, VARBINARY_T, LengthColumn<ByteArray, VARBINARY_T>>.() -> Unit) = LengthColumnConfiguration( this, name, VARBINARY_T, length).add( block)
   protected fun TINYBLOB(name: String, block: NormalColumnConfiguration<ByteArray, TINYBLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, TINYBLOB_T).add( block)
   protected fun BLOB(name: String, block: NormalColumnConfiguration<ByteArray, BLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, BLOB_T).add( block)
   protected fun MEDIUMBLOB(name: String, block: NormalColumnConfiguration<ByteArray, MEDIUMBLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, MEDIUMBLOB_T).add( block)
   protected fun LONGBLOB(name: String, block: NormalColumnConfiguration<ByteArray, LONGBLOB_T>.() -> Unit) = NormalColumnConfiguration( this, name, LONGBLOB_T).add( block)
-  protected fun TINYTEXT(name: String, block: CharColumnConfiguration<String, TINYTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, TINYTEXT_T).add( block)
-  protected fun TEXT(name: String, block: CharColumnConfiguration<String, TEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, TEXT_T).add( block)
-  protected fun MEDIUMTEXT(name: String, block: CharColumnConfiguration<String, MEDIUMTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, MEDIUMTEXT_T).add( block)
-  protected fun LONGTEXT(name: String, block: CharColumnConfiguration<String, LONGTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, LONGTEXT_T).add( block)
+  protected fun TINYTEXT(name: String, block: CharColumnConfiguration<TINYTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, TINYTEXT_T).add( block)
+  protected fun TEXT(name: String, block: CharColumnConfiguration<TEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, TEXT_T).add( block)
+  protected fun MEDIUMTEXT(name: String, block: CharColumnConfiguration<MEDIUMTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, MEDIUMTEXT_T).add( block)
+  protected fun LONGTEXT(name: String, block: CharColumnConfiguration<LONGTEXT_T>.() -> Unit) = CharColumnConfiguration( this, name, LONGTEXT_T).add( block)
 
   /* Versions without configuration closure */
   protected fun BIT(name: String) = NormalColumnConfiguration(this, name, BIT_T).add({})
@@ -186,18 +186,18 @@ abstract class MutableTable private constructor(name: String?,
   }
 
   /* Otherwise, the various types need to be distinguished. The different subtypes of column are needed for overload resolution */
-  protected fun <T:Any, S:DecimalColumnType<T,S>>reference(other: DecimalColumn<T,S>, block: DecimalColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(null, this).add(block)
-  protected fun <T:Any, S:LengthCharColumnType<T,S>>reference(other: LengthCharColumn<T,S>, block: LengthCharColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(null, this).add(block)
-  protected fun <T:Any, S:CharColumnType<T,S>>reference(other: CharColumn<T,S>, block: CharColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(null, this).add(block)
+  protected fun <S:DecimalColumnType<S>>reference(other: DecimalColumn<S>, block: DecimalColumnConfiguration<S>.() -> Unit) = other.copyConfiguration(null, this).add(block)
+  protected fun <S:LengthCharColumnType<S>>reference(other: LengthCharColumn<S>, block: LengthCharColumnConfiguration<S>.() -> Unit) = other.copyConfiguration(null, this).add(block)
+  protected fun <S:CharColumnType<S>>reference(other: CharColumn<S>, block: CharColumnConfiguration<S>.() -> Unit) = other.copyConfiguration(null, this).add(block)
   protected fun <T:Any, S:SimpleColumnType<T,S>>reference(other: SimpleColumn<T,S>, block: NormalColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(null, this).add(block)
   protected fun <T:Any, S:LengthColumnType<T,S>>reference(other: LengthColumn<T,S>, block: LengthColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(null, this).add(block)
   protected fun <T:Any, S:NumericColumnType<T,S>>reference(other: NumericColumn<T,S>, block: NumberColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(null, this).add(block)
 
 
   /* Otherwise, the various types need to be distinguished. The different subtypes of column are needed for overload resolution */
-  protected fun <T:Any, S:DecimalColumnType<T,S>>reference(newName:String, other: DecimalColumn<T,S>, block: DecimalColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(newName, this).add(block)
-  protected fun <T:Any, S:LengthCharColumnType<T,S>>reference(newName:String, other: LengthCharColumn<T,S>, block: LengthCharColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(newName, this).add(block)
-  protected fun <T:Any, S:CharColumnType<T,S>>reference(newName:String, other: CharColumn<T,S>, block: CharColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(newName, this).add(block)
+  protected fun <S:DecimalColumnType<S>>reference(newName:String, other: DecimalColumn<S>, block: DecimalColumnConfiguration<S>.() -> Unit) = other.copyConfiguration(newName, this).add(block)
+  protected fun <S:LengthCharColumnType<S>>reference(newName:String, other: LengthCharColumn<S>, block: LengthCharColumnConfiguration<S>.() -> Unit) = other.copyConfiguration(newName, this).add(block)
+  protected fun <S:CharColumnType<S>>reference(newName:String, other: CharColumn<S>, block: CharColumnConfiguration<S>.() -> Unit) = other.copyConfiguration(newName, this).add(block)
   protected fun <T:Any, S:SimpleColumnType<T,S>>reference(newName:String, other: SimpleColumn<T,S>, block: NormalColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(newName, this).add(block)
   protected fun <T:Any, S:LengthColumnType<T,S>>reference(newName:String, other: LengthColumn<T,S>, block: LengthColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(newName, this).add(block)
   protected fun <T:Any, S:NumericColumnType<T,S>>reference(newName:String, other: NumericColumn<T,S>, block: NumberColumnConfiguration<T,S>.() -> Unit) = other.copyConfiguration(newName, this).add(block)

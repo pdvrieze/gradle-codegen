@@ -21,6 +21,7 @@
 package uk.ac.bournemouth.util.kotlin.sql
 
 import uk.ac.bournemouth.kotlinsql.*
+import uk.ac.bournemouth.util.kotlin.sql.impl.gen._Statement1
 import java.sql.*
 import java.util.*
 import java.util.concurrent.Executor
@@ -217,181 +218,21 @@ class DBConnection constructor(private val connection: Connection, val db: Datab
   @Throws(SQLException::class)
   fun setSavepoint(): Savepoint = connection.setSavepoint()
 
-  /**
-   * Creates a savepoint with the given name in the current transaction
-   * and returns the new `Savepoint` object that represents it.
-
-   *
-   *  if setSavepoint is invoked outside of an active transaction, a transaction will be started at this newly created
-   * savepoint.
-
-   * @param name a `String` containing the name of the savepoint
-   * *
-   * @return the new `Savepoint` object
-   * *
-   * @exception SQLException if a database access error occurs,
-   * * this method is called while participating in a distributed transaction,
-   * * this method is called on a closed connection
-   * *            or this `Connection` object is currently in
-   * *            auto-commit mode
-   * *
-   * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
-   * * this method
-   * *
-   * @see Savepoint
-
-   * @since 1.4
-   */
   @Throws(SQLException::class)
   fun setSavepoint(name: String): Savepoint = connection.setSavepoint(name)
 
-  /**
-   * Undoes all changes made after the given `Savepoint` object
-   * was set.
-   *
-   * This method should be used only when auto-commit has been disabled.
-
-   * @param savepoint the `Savepoint` object to roll back to
-   * *
-   * @exception SQLException if a database access error occurs,
-   * * this method is called while participating in a distributed transaction,
-   * * this method is called on a closed connection,
-   * *            the `Savepoint` object is no longer valid,
-   * *            or this `Connection` object is currently in
-   * *            auto-commit mode
-   * *
-   * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
-   * * this method
-   * *
-   * @see Savepoint
-
-   * @see .rollback
-
-   * @since 1.4
-   */
   @Throws(SQLException::class)
   fun rollback(savepoint: Savepoint) = connection.rollback(savepoint)
 
-  /**
-   * Removes the specified `Savepoint`  and subsequent `Savepoint` objects from the current
-   * transaction. Any reference to the savepoint after it have been removed
-   * will cause an `SQLException` to be thrown.
-
-   * @param savepoint the `Savepoint` object to be removed
-   * *
-   * @exception SQLException if a database access error occurs, this
-   * *  method is called on a closed connection or
-   * *            the given `Savepoint` object is not a valid
-   * *            savepoint in the current transaction
-   * *
-   * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
-   * * this method
-   * *
-   * @since 1.4
-   */
   @Throws(SQLException::class)
   fun releaseSavepoint(savepoint: Savepoint) = connection.releaseSavepoint(savepoint)
 
-  /**
-   * Creates a `PreparedStatement` object that will generate
-   * `ResultSet` objects with the given type, concurrency,
-   * and holdability.
-   *
-   * This method is the same as the `prepareStatement` method
-   * above, but it allows the default result set
-   * type, concurrency, and holdability to be overridden.
-
-   * @param sql a `String` object that is the SQL statement to
-   * *            be sent to the database; may contain one or more '?' IN
-   * *            parameters
-   * *
-   * @param resultSetType one of the following `ResultSet`
-   * *        constants:
-   * *         `ResultSet.TYPE_FORWARD_ONLY`,
-   * *         `ResultSet.TYPE_SCROLL_INSENSITIVE`, or
-   * *         `ResultSet.TYPE_SCROLL_SENSITIVE`
-   * *
-   * @param resultSetConcurrency one of the following `ResultSet`
-   * *        constants:
-   * *         `ResultSet.CONCUR_READ_ONLY` or
-   * *         `ResultSet.CONCUR_UPDATABLE`
-   * *
-   * @param resultSetHoldability one of the following `ResultSet`
-   * *        constants:
-   * *         `ResultSet.HOLD_CURSORS_OVER_COMMIT` or
-   * *         `ResultSet.CLOSE_CURSORS_AT_COMMIT`
-   * *
-   * @return a new `PreparedStatement` object, containing the
-   * *         pre-compiled SQL statement, that will generate
-   * *         `ResultSet` objects with the given type,
-   * *         concurrency, and holdability
-   * *
-   * @exception SQLException if a database access error occurs, this
-   * * method is called on a closed connection
-   * *            or the given parameters are not `ResultSet`
-   * *            constants indicating type, concurrency, and holdability
-   * *
-   * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
-   * * this method or this method is not supported for the specified result
-   * * set type, result set holdability and result set concurrency.
-   * *
-   * @see ResultSet
-
-   * @since 1.4
-   */
   @Throws(SQLException::class)
   fun <R> prepareStatement(sql: String, resultSetType: Int,
                                   resultSetConcurrency: Int, resultSetHoldability: Int, block: (StatementHelper) -> R): R {
     return connection.prepareStatement(sql, resultSetType, resultSetConcurrency, resultSetHoldability).use { block(StatementHelper(it)) }
   }
 
-  /**
-   * Creates a default `PreparedStatement` object that has
-   * the capability to retrieve auto-generated keys. The given constant
-   * tells the driver whether it should make auto-generated keys
-   * available for retrieval.  This parameter is ignored if the SQL statement
-   * is not an `INSERT` statement, or an SQL statement able to return
-   * auto-generated keys (the list of such statements is vendor-specific).
-   *
-   * Note: This method is optimized for handling
-   * parametric SQL statements that benefit from precompilation. If
-   * the driver supports precompilation,
-   * the method `prepareStatement` will send
-   * the statement to the database for precompilation. Some drivers
-   * may not support precompilation. In this case, the statement may
-   * not be sent to the database until the `PreparedStatement`
-   * object is executed.  This has no direct effect on users; however, it does
-   * affect which methods throw certain SQLExceptions.
-   *
-   * Result sets created using the returned `PreparedStatement`
-   * object will by default be type `TYPE_FORWARD_ONLY`
-   * and have a concurrency level of `CONCUR_READ_ONLY`.
-   * The holdability of the created result sets can be determined by
-   * calling [.getHoldability].
-
-   * @param sql an SQL statement that may contain one or more '?' IN
-   * *        parameter placeholders
-   * *
-   * @param autoGeneratedKeys a flag indicating whether auto-generated keys
-   * *        should be returned; one of
-   * *        `Statement.RETURN_GENERATED_KEYS` or
-   * *        `Statement.NO_GENERATED_KEYS`
-   * *
-   * @return a new `PreparedStatement` object, containing the
-   * *         pre-compiled SQL statement, that will have the capability of
-   * *         returning auto-generated keys
-   * *
-   * @exception SQLException if a database access error occurs, this
-   * *  method is called on a closed connection
-   * *         or the given parameter is not a `Statement`
-   * *         constant indicating whether auto-generated keys should be
-   * *         returned
-   * *
-   * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
-   * * this method with a constant of Statement.RETURN_GENERATED_KEYS
-   * *
-   * @since 1.4
-   */
   @Throws(SQLException::class)
   fun <R> prepareStatement(sql: String, autoGeneratedKeys: Int, block: (StatementHelper) -> R): R {
     return connection.prepareStatement(sql, autoGeneratedKeys).use { block(StatementHelper(it)) }
@@ -457,7 +298,6 @@ class DBConnection constructor(private val connection: Connection, val db: Datab
 
   @Throws(SQLException::class)
   fun getNetworkTimeout(): Int = connection.networkTimeout
-
 
 }
 

@@ -90,9 +90,6 @@ dependencies {
 }
 
 idea{
-    project {
-        languageLevel = '1.8'
-    }
     module {
         downloadSources = true
     }
