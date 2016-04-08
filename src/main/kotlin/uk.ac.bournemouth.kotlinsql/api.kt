@@ -76,7 +76,7 @@ interface IColumnType<T:Any, S: IColumnType<T, S, C>, C:Column<T,S,C>> {
 
   fun newConfiguration(owner: Table, refColumn: C): AbstractColumnConfiguration<T,S, C, out Any>
 
-  fun fromResultSet(rs: ResultSet, pos: Int): T
+  fun fromResultSet(rs: ResultSet, pos: Int): T?
 }
 
 sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(override val typeName:String, override val type: KClass<T>): IColumnType<T,S,C> {
@@ -99,26 +99,26 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(override
 
   sealed class NumericColumnType<T:Any, S: NumericColumnType<T, S>>(typeName: String, type: KClass<T>):ColumnType<T,S, NumericColumn<T,S>>(typeName, type), INumericColumnType<T,S, NumericColumn<T,S>> {
     object TINYINT_T   : NumericColumnType<Byte, TINYINT_T>("BIGINT", Byte::class){
-      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getByte(pos)
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getByte(pos).let { if (rs.wasNull()) null else it }
     }
     object SMALLINT_T  : NumericColumnType<Short, SMALLINT_T>("SMALLINT", Short::class){
-      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getShort(pos)
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getShort(pos).let { if (rs.wasNull()) null else it }
     }
     object MEDIUMINT_T : NumericColumnType<Int, MEDIUMINT_T>("MEDIUMINT", Int::class){
-      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getInt(pos)
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getInt(pos).let { if (rs.wasNull()) null else it }
     }
     object INT_T       : NumericColumnType<Int, INT_T>("INT", Int::class){
-      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getInt(pos)
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getInt(pos).let { if (rs.wasNull()) null else it }
     }
     object BIGINT_T    : NumericColumnType<Long, BIGINT_T>("BIGINT", Long::class){
-      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getLong(pos)
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getLong(pos).let { if (rs.wasNull()) null else it }
     }
 
     object FLOAT_T     : NumericColumnType<Float, FLOAT_T>("FLOAT", Float::class){
-      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getFloat(pos)
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getFloat(pos).let { if (rs.wasNull()) null else it }
     }
     object DOUBLE_T    : NumericColumnType<Double, DOUBLE_T>("DOUBLE", Double::class){
-      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getDouble(pos)
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getDouble(pos).let { if (rs.wasNull()) null else it }
     }
 
     override fun newConfiguration(owner: Table, refColumn: NumericColumn<T,S>)=
@@ -142,7 +142,7 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(override
 
     object BIT_T       : SimpleColumnType<Boolean, BIT_T>("BIT", Boolean::class), BoundedType {
       override val maxLen = 64
-      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getBoolean(pos)
+      override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getBoolean(pos).let { if (rs.wasNull()) null else it }
     }
 
     object DATE_T      : SimpleColumnType<java.sql.Date, DATE_T>("DATE", java.sql.Date::class){
@@ -188,10 +188,10 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(override
   sealed class CharColumnType<S:CharColumnType<S>>(typeName: String, type: KClass<String>):ColumnType<String,S, CharColumn<S>>(typeName, type), ICharColumnType<S, CharColumn<S>> {
     override fun fromResultSet(rs: ResultSet, pos: Int) = rs.getString(pos)
 
-    object TINYTEXT_T  : CharColumnType<TINYTEXT_T>("TINYTEXT", String::class), BoundedType { override val maxLen = 255 }
-    object TEXT_T      : CharColumnType<TEXT_T>("TEXT", String::class), BoundedType { override val maxLen = 0xffff }
-    object MEDIUMTEXT_T: CharColumnType<MEDIUMTEXT_T>("MEDIUMTEXT", String::class), BoundedType { override val maxLen = 0xffffff }
-    object LONGTEXT_T  : CharColumnType<LONGTEXT_T>("LONGTEXT", String::class), BoundedType { override val maxLen = Int.MAX_VALUE /*Actually it would be more*/}
+    object TINYTEXT_T  : CharColumnType<TINYTEXT_T>("TINYTEXT", String::class), BoundedType { override val maxLen:Int get() = 255 }
+    object TEXT_T      : CharColumnType<TEXT_T>("TEXT", String::class), BoundedType { override val maxLen:Int get() = 0xffff }
+    object MEDIUMTEXT_T: CharColumnType<MEDIUMTEXT_T>("MEDIUMTEXT", String::class), BoundedType { override val maxLen:Int get() = 0xffffff }
+    object LONGTEXT_T  : CharColumnType<LONGTEXT_T>("LONGTEXT", String::class), BoundedType { override val maxLen:Int get() = Int.MAX_VALUE /*Actually it would be more*/}
 
     @Suppress("UNCHECKED_CAST")
     override fun newConfiguration(owner: Table, refColumn: CharColumn<S>) =
@@ -225,8 +225,8 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(override
 
   sealed class LengthCharColumnType<S:LengthCharColumnType<S>>(typeName: String, type: KClass<String>):ColumnType<String,S, LengthCharColumn<S>>(typeName, type), ILengthColumnType<String,S,LengthCharColumn<S>>, ICharColumnType<S,LengthCharColumn<S>> {
 
-    object CHAR_T      : LengthCharColumnType<CHAR_T>("CHAR", String::class), BoundedType { override val maxLen = 255 }
-    object VARCHAR_T   : LengthCharColumnType<VARCHAR_T>("VARCHAR", String::class), BoundedType { override val maxLen = 0xffff }
+    object CHAR_T      : LengthCharColumnType<CHAR_T>("CHAR", String::class), BoundedType { override val maxLen:Int get() = 255 }
+    object VARCHAR_T   : LengthCharColumnType<VARCHAR_T>("VARCHAR", String::class), BoundedType { override val maxLen:Int get() = 0xffff }
 
     override fun newConfiguration(owner: Table, refColumn: LengthCharColumn<S>) =
           LengthCharColumnConfiguration(owner, refColumn.name, this as S, (refColumn as LengthCharColumn).length)

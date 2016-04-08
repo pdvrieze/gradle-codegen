@@ -41,6 +41,7 @@ class GenerateStatementsKt(val count:Int):GenerateImpl {
       appendln("import uk.ac.bournemouth.kotlinsql.Database.*")
       appendln("import uk.ac.bournemouth.kotlinsql.IColumnType")
       appendln("import uk.ac.bournemouth.util.kotlin.sql.DBConnection")
+      appendln("import java.sql.SQLException")
 
       for (n in 1..count) {
         appendln()
@@ -52,26 +53,62 @@ class GenerateStatementsKt(val count:Int):GenerateImpl {
           1    -> appendln(">, where:WhereClause):_Statement1Base<T1,S1,C1>(select,where) {")
           else -> appendln(">, where:WhereClause):_StatementBase(where) {")
         }
+        if (n>1) {
+          appendln()
+          append("  data class Result<")
+          (1..n).joinTo(this) { "T$it" }
+          append(">(")
+          (1..n).joinTo(this) { "val col$it:T$it?" }
+          appendln(")")
+        }
+
         appendln()
-        appendln("  @Suppress(\"UNCHECKED_CAST\")")
         append("  fun execute(connection:DBConnection, block: (")
-        (1..n).joinToString(",") {m -> "T$m"}.apply { append(this) }
+        (1..n).joinToString(",") {m -> "T$m?"}.apply { append(this) }
         appendln(")->Unit):Boolean {")
         appendln("    return executeHelper(connection, block) { rs, block ->")
         append("      block(")
-        if (n==1) {
-          append("select.col1.type.fromResultSet(rs, 1)")
-        } else {
-          (1..n).joinToString(",\n${" ".repeat(12)}") { m -> "(select.columns[$m] as C$m).type.fromResultSet(rs, $m)" }.apply { append(this) }
-        }
+        (1..n).joinToString(",\n${" ".repeat(12)}") { m -> "select.col$m.type.fromResultSet(rs, $m)" }.apply { append(this) }
+//        if (n==1) {
+//          append("select.col1.type.fromResultSet(rs, 1)")
+//        } else {
+//        }
         appendln(')')
         appendln("    }")
         appendln("  }")
-        appendln()
 
-        append("  fun <R>getList(connection: DBConnection, factory:(")
-        (1..n).joinToString(",") { "T$it" }.apply { append(this) }
-        appendln(")->R): List<R> {")
+        if (n>1) {
+          appendln()
+          append("  fun getSingle(connection:DBConnection)")
+          append(" = getSingle(connection) { ")
+          (1..n).joinTo(this,",") { "p$it" }
+          append(" -> Result(")
+          (1..n).joinTo(this,",") { "p$it" }
+          appendln(")}")
+
+          appendln()
+          append("  fun <R>getSingle(connection:DBConnection, factory:")
+          appendFactorySignature(n)
+          appendln("):R? {")
+          appendln("    return connection.prepareStatement(toSQL()) {")
+          appendln("      setParams(this)")
+          appendln("      execute { rs ->")
+          appendln("        if (rs.next()) {")
+          appendln("          if (!rs.isLast()) throw SQLException(\"Multiple results found, where only one or none expected\")")
+            append("          factory(")
+          (1..n).joinTo(this,",\n${" ".repeat(18)}") { m -> "select.col$m.type.fromResultSet(rs, $m)" }
+          appendln(")")
+
+          appendln("        } else null ")
+          appendln("      }")
+          appendln("    }")
+          appendln("  }")
+        }
+
+        appendln()
+        append("  fun <R>getList(connection: DBConnection, factory:")
+        appendFactorySignature(n)
+        appendln("): List<R> {")
         appendln("    val result=mutableListOf<R>()")
         append("    execute(connection) { ")
         (1..n).joinToString { "p$it" }.apply { append(this) }
@@ -86,5 +123,11 @@ class GenerateStatementsKt(val count:Int):GenerateImpl {
         appendln("}")
       }
     }
+  }
+
+  private fun Appendable.appendFactorySignature(n: Int) {
+    append("(")
+    (1..n).joinToString(",") { "T$it?" }.apply { append(this) }
+    append(")->R")
   }
 }

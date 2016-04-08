@@ -200,7 +200,8 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
         setParams(this)
         execute { rs ->
           if (rs.next()) {
-            select.col1.type.fromResultSet(rs, 1).apply { if (rs.next()) throw SQLException("Multiple results found, where only one or none expected") }
+            if (!rs.isLast()) throw SQLException("Multiple results found, where only one or none expected")
+            select.col1.type.fromResultSet(rs, 1)
           } else {
             null
           }
@@ -208,9 +209,20 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
       }
     }
 
-    fun getList(connection:DBConnection): List<T1> {
-      val result=mutableListOf<T1>()
+    /**
+     * Get a list of all values from the query. This can include null values.
+     */
+    fun getList(connection:DBConnection): List<T1?> {
+      val result=mutableListOf<T1?>()
       executeHelper(connection, Unit) {rs, b -> result.add(select.col1.type.fromResultSet(rs,1))}
+      return result
+
+    }
+
+    /** Get a list of all non-null values resulting from the query.*/
+    fun getSafeList(connection:DBConnection): List<T1> {
+      val result=mutableListOf<T1>()
+      executeHelper(connection, Unit) {rs, b -> select.col1.type.fromResultSet(rs,1)?.let { result.add(it) } }
       return result
 
     }

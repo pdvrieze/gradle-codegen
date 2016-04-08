@@ -40,6 +40,7 @@ class GenerateSelectClasses(val count:Int):GenerateImpl {
       appendln("import uk.ac.bournemouth.kotlinsql.IColumnType")
       for (n in 2..count) {
         appendln()
+        appendln("@Suppress(\"UNCHECKED_CAST\")")
         append("class _Select$n<")
         (1..n).joinToString(",\n               ") { m -> "T$m:Any, S$m:IColumnType<T$m,S$m,C$m>, C$m: Column<T$m, S$m, C$m>" }.apply { append(this) }
 
@@ -50,6 +51,11 @@ class GenerateSelectClasses(val count:Int):GenerateImpl {
         appendln("){")
         appendln("    override fun WHERE(config: _Where.() -> WhereClause) =")
         appendln("        _Statement$n(this, _Where().config())")
+        appendln()
+        for(m in 1..n) {
+          appendln("    val col$m: C$m get() = columns[$m] as C$m")
+        }
+
         appendln("}")
 
       }
