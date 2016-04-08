@@ -42,28 +42,36 @@ class GenerateDatabaseBaseKt(val count:Int): GenerateImpl {
       appendln("open class DatabaseMethods {")
 //      appendln("  companion object {")
 
-      for(n in 1..count) {
-//        appendln("    @JvmStatic")
-        append("    fun <")
+      appendFunctionGroup("SELECT","_Select")
+      appendFunctionGroup("INSERT","_Insert")
 
-        run {
-          val indent = " ".repeat(if (n<9) 9 else 10)
-          (1..n).joinToString(",\n${indent}") { m -> "T$m:Any, S$m:IColumnType<T$m,S$m,C$m>, C$m: Column<T$m, S$m, C$m>" }.apply { append(this) }
-        }
-        append("> SELECT(")
-        (1..n).joinToString{ m -> "col$m: C$m" }.apply {append(this)}
-        appendln(")=")
-        if (n==1) {
-          append("        Database._Select$n(")
-        } else {
-          append("        _Select$n(")
-        }
-        (1..n).joinToString{ m -> "col$m" }.apply {append(this)}
-        appendln(")")
-        appendln()
-      }
 //      appendln("  }")
       appendln("}")
+    }
+  }
+
+  private fun Writer.appendFunctionGroup(funName:String, className:String) {
+    for (n in 1..count) {
+      appendln()
+  //        appendln("    @JvmStatic")
+      append("    fun <")
+
+      run {
+        val indent = " ".repeat(if (n < 9) 9 else 10)
+        (1..n).joinToString(",\n${indent}") { m -> "T$m:Any, S$m:IColumnType<T$m,S$m,C$m>, C$m: Column<T$m, S$m, C$m>" }.apply {
+          append(this)
+        }
+      }
+      append("> ${funName}(")
+      (1..n).joinToString { m -> "col$m: C$m" }.apply { append(this) }
+      appendln(")=")
+      if (n == 1 && funName=="SELECT") {
+        append("            Database.$className$n(")
+      } else {
+        append("            $className$n(")
+      }
+      (1..n).joinToString { m -> "col$m" }.apply { append(this) }
+      appendln(")")
     }
   }
 }

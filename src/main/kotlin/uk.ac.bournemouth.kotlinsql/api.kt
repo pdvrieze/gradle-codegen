@@ -73,6 +73,11 @@ interface IColumnType<T:Any, S: IColumnType<T, S, C>, C:Column<T,S,C>> {
 
   fun cast(column: Column<*,*,*>): Column<T, S, C>
   fun cast(value: Any): T
+  /**
+   * Cast the given value to the type of the column. Null values are fine, incompatible values will
+   * throw a ClassCastException
+   */
+  fun maybeCast(value: Any?): T?
 
   fun newConfiguration(owner: Table, refColumn: C): AbstractColumnConfiguration<T,S, C, out Any>
 
@@ -88,6 +93,10 @@ sealed class ColumnType<T:Any, S: ColumnType<T, S, C>, C:Column<T,S,C>>(override
     } else {
       throw TypeCastException("The given column is not of the correct type")
     }
+  }
+
+  override fun maybeCast(value: Any?): T? {
+    return if (value!=null) type.java.cast(value) else null
   }
 
   override fun cast(value:Any): T {

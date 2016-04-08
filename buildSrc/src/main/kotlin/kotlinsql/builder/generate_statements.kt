@@ -27,8 +27,6 @@ package kotlinsql.builder
 import org.gradle.api.file.FileCollection
 import java.io.Writer
 
-const val count=10
-
 class GenerateStatementsKt(val count:Int):GenerateImpl {
   override fun doGenerate(output: Writer, input: FileCollection?) {
     output.apply {

@@ -66,15 +66,19 @@ sourceSets {
             def depth = 10
             databaseFunctions{
                 output = 'gen/DatabaseMethods.kt'
-                generator = new GenerateDatabaseBaseKt(depth)
+                generator = new kotlinsql.builder.GenerateDatabaseBaseKt(depth)
             }
             selects{
                 output = 'gen/selectImpls.kt'
-                generator = new GenerateSelectClasses(depth)
+                generator = new kotlinsql.builder.GenerateSelectClasses(depth)
             }
             statements{
                 output = 'gen/statementImpls.kt'
-                generator = new GenerateStatementsKt(depth)
+                generator = new kotlinsql.builder.GenerateStatementsKt(depth)
+            }
+            inserts{
+                output = 'gen/Inserts.kt'
+                generator = new kotlinsql.builder.GenerateInsertsKt(depth)
             }
 
         }

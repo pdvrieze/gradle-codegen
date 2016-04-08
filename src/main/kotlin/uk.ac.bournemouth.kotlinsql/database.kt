@@ -172,14 +172,16 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
     val NULL:RefWhereValue=object:RefWhereValue() { override fun toSQL(prefixMap: Map<String, String>?)= "NULL" }
   }
 
-  interface Statement {
-    val select:Select
-
+  interface  Statement {
     /** Generate the SQL corresponding to the statement.*/
     fun toSQL(): String
 
     /** Set the parameter values */
-    fun setParams(statementHelper: StatementHelper, first: Int =1)
+    fun setParams(statementHelper: StatementHelper, first: Int =1): Int
+  }
+
+  interface SelectStatement:Statement {
+    val select:Select
   }
 
   abstract class WhereValue internal constructor() {
@@ -229,15 +231,37 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
 
   }
 
-  abstract class _StatementBase(val where:WhereClause): Statement {
+  class _UpdateStatement(val update: _UpdateBase, val where: WhereClause): Statement {
+    override fun toSQL(): String {
+      return "${update.toSQL()} WHERE ${where.toSQL(null)}"
+    }
+
+    override fun setParams(statementHelper: StatementHelper, first: Int):Int {
+      return where.setParameters(statementHelper, first)
+    }
+
+    /**
+     * Execute the statement.
+     * @param The connection object to use for the query
+     * @return The amount of rows changed
+     * @see java.sql.PreparedStatement.executeUpdate
+     */
+    fun execute(connection: DBConnection):Int {
+      return connection.prepareStatement(toSQL()) {
+        executeUpdate()
+      }
+    }
+
+  }
+
+  abstract class _StatementBase(val where:WhereClause): SelectStatement {
     override fun toSQL(): String {
       val prefixMap = select.createTablePrefixMap()
       return "${select.toSQL(prefixMap)} WHERE ${where.toSQL(prefixMap)}"
     }
 
-    override fun setParams(statementHelper: StatementHelper, first: Int) {
-      where.setParameters(statementHelper,first)
-    }
+    override fun setParams(statementHelper: StatementHelper, first: Int) =
+          where.setParameters(statementHelper, first)
 
     protected fun <T> executeHelper(connection: DBConnection, block: T, invokeHelper:(ResultSet, T)->Unit):Boolean {
       return connection.prepareStatement(toSQL()) {
@@ -261,10 +285,10 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
     override fun toSQL(prefixMap: Map<String, String>?)="$left $rel $right"
   }
 
-  interface Select:Statement {
+  interface Select: SelectStatement {
     fun createTablePrefixMap(): Map<String, String>?
     fun toSQL(prefixMap:Map<String,String>?): String
-    fun WHERE(config: _Where.() -> WhereClause):Statement
+    fun WHERE(config: _Where.() -> WhereClause): SelectStatement
   }
 
   abstract class _BaseSelect(vararg val columns:Column<*,*,*>):Select {
@@ -283,9 +307,7 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
       }
     }
 
-    override fun setParams(statementHelper: StatementHelper, first: Int): Unit {
-      /* No implementation for selects */
-    }
+    override fun setParams(statementHelper: StatementHelper, first: Int) = first
 
     private fun tableNames() = columns.map { it.table._name }.toSortedSet()
 
@@ -341,11 +363,52 @@ abstract class Database private constructor(val _version:Int, val _tables:List<T
     override fun toSQL(): String = "SELECT `${col1.name}` FROM `${col1.table._name}`"
     override fun toSQL(prefixMap: Map<String, String>?) = toSQL()
 
-    override fun setParams(statementHelper: StatementHelper, first: Int): Unit {
-      /* No implementation for selects */
+    override fun setParams(statementHelper: StatementHelper, first: Int) = first
+
+  }
+
+  abstract class _UpdateBase internal constructor(val table:TableRef): Statement {
+    fun WHERE(config: _Where.() -> WhereClause) = _UpdateStatement(this, _Where().config())
+
+
+    override fun setParams(statementHelper: StatementHelper, first: Int) = first
+  }
+
+  class _Delete internal constructor(table:TableRef): _UpdateBase(table) {
+    override fun toSQL(): String {
+      return "DELETE_FROM ${table._name}"
+    }
+  }
+
+  interface Insert {
+    fun toSQL():String
+  }
+
+  abstract class _BaseInsert(vararg val columns:ColumnRef<*,*,*>):Insert {
+    override fun toSQL() =
+          columns.joinToString(", ", "INSERT INTO ${columns[1].table._name} (", ")") { col -> col.name }
+
+    abstract inner class _BaseInsertValues(vararg val values:Any): Statement {
+      override fun toSQL(): String {
+        return (1..values.size).joinToString { "?" }
+      }
+
+      override fun setParams(statementHelper: StatementHelper, first: Int):Int {
+        for(i in columns.indices) {
+          val col = columns[i]
+          val value = col.type.maybeCast(values[i])
+          statementHelper.setParam_(first+i, value)
+        }
+        return first+columns.size
+      }
     }
 
   }
+
+  fun DELETE_FROM(table: Table) = _Delete(table)
+
+
+
 
 }
 
