@@ -7,3 +7,4 @@ build
 /.gradle
 /.idea/modules
 /.idea/modules.xml
+local.properties
