@@ -62,7 +62,7 @@ class GenerateInsertsKt(val count:Int):GenerateImpl {
         (1..n).joinTo(output) { m -> "col$m"}
         appendln(")")
 
-        append("  inner class _InsertValues(")
+        append("  inner class _InsertValues$n(")
         (1..n).joinTo(output) { m -> "col$m: T$m"}
         append("):_BaseInsertValues(")
         (1..n).joinTo(output) { m -> "col$m" }
@@ -71,13 +71,6 @@ class GenerateInsertsKt(val count:Int):GenerateImpl {
         appendln()
         appendln("}")
 
-      }
-
-      for(n in 1..count) {
-        appendln()
-        append("class _InsertValues<")
-        (1..n).joinTo(output) { m -> "T$m" }
-        appendln(">(insert: _Insert$n, ")
       }
 
     }
