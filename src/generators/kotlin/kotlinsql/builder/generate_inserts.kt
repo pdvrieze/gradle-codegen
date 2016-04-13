@@ -20,8 +20,6 @@
 
 package kotlinsql.builder
 
-import net.devrieze.gradlecodgen.GenerateImpl
-import org.gradle.api.file.FileCollection
 import java.io.Writer
 
 internal fun indent(n:Int, baseLen:Int) = " ".repeat(when (n) {
