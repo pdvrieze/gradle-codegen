@@ -65,9 +65,9 @@ bintray {
 
         version {
             name = project.version
-            desc = 'Initial release of functionality. In this release, generators can only use a single output file.'
+            desc = 'Fixed when not using kotlin. Kotlin is now optionally supported.'
             released = new Date()
-            vcsTag = '0.5'
+            vcsTag = 'v0.5.1'
 //            attributes = [ 'gradle-plugin': 'net.devrieze.gradlecodegen:' ]
         }
     }
