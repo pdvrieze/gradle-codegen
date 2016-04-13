@@ -59,43 +59,55 @@ open class GenerateTask: DefaultTask() {
   @OutputDirectory
   var outputDir:Any = project.file(DEFAULT_GEN_DIR)
 
-  var classPath: FileCollection? = null
+  var classpath: FileCollection? = null
 
   @Input
   internal var container: NamedDomainObjectContainer<GenerateSpec>? = null
 
   @TaskAction
   private fun generate() {
-    container?.all { spec: GenerateSpec ->
-      // TODO don't pass the local classloader, generators should not be able to use internals
-      URLClassLoader(combinedClasspath(spec.classpath),javaClass.classLoader).use { classLoader ->
-
-        if (spec.output!=null) {
-          val outFile = File(project.file(outputDir), spec.output)
-
-          if (project.logger.isInfoEnabled) {
-            project.logger.info("Generating ${spec.name} as '${spec.output}' as '${outFile}'")
-          } else {
-            project.logger.lifecycle("Generating ${spec.name} as '${spec.output}'")
+    URLClassLoader(combinedClasspath(null)). use { joinedLoader ->
+      container?.all { spec: GenerateSpec ->
+        val specClasspath = spec.classpath
+        if (specClasspath ==null || specClasspath.isEmpty) {
+          generateSpec(spec, joinedLoader)
+        } else {
+          URLClassLoader(combinedClasspath(spec.classpath)).use { classLoader ->
+            generateSpec(spec, classLoader)
           }
-          if (spec.generator!=null) { val gname = spec.generator
-            val generatorClass = classLoader.loadClass(gname)
-            val generatorInst = generatorClass.newInstance()
-            if (! outFile.isFile) {
-              outFile.parentFile.mkdirs()
-              outFile.createNewFile()
-            }
-            val m = generatorClass.getGenerateMethod(spec.input)
-            outFile.writer().use { writer ->
-              if (m.parameterCount==2) {
-                m.invoke(generatorInst, writer, spec.input)
-              } else {
-                m.invoke(generatorInst, writer)
-              }
-            }
-
-          } else { logger.quiet("Missing output code for generateSpec ${spec.name}, no generator provided") }
         }
+      }
+    }
+  }
+
+  private fun generateSpec(spec: GenerateSpec, classLoader: ClassLoader) {
+    if (spec.output != null) {
+      val outFile = File(project.file(outputDir), spec.output)
+
+      if (project.logger.isInfoEnabled) {
+        project.logger.info("Generating ${spec.name} as '${spec.output}' as '${outFile}'")
+      } else {
+        project.logger.lifecycle("Generating ${spec.name} as '${spec.output}'")
+      }
+      if (spec.generator != null) {
+        val gname = spec.generator
+        val generatorClass = classLoader.loadClass(gname)
+        val generatorInst = generatorClass.newInstance()
+        if (!outFile.isFile) {
+          outFile.parentFile.mkdirs()
+          outFile.createNewFile()
+        }
+        val m = generatorClass.getGenerateMethod(spec.input)
+        outFile.writer().use { writer ->
+          if (m.parameterCount == 2) {
+            m.invoke(generatorInst, writer, spec.input)
+          } else {
+            m.invoke(generatorInst, writer)
+          }
+        }
+
+      } else {
+        logger.quiet("Missing output code for generateSpec ${spec.name}, no generator provided")
       }
     }
   }
@@ -116,9 +128,9 @@ open class GenerateTask: DefaultTask() {
     fun Iterable<File>.toUrls():Sequence<URL> = asSequence().map { it.toURI().toURL() }
 
     return mutableListOf<URL>().apply {
-      classPath?.let{ it.toUrls().forEach{ add(it) } }
+      classpath?.let{ it.toUrls().forEach{ add(it) } }
       others?.let{ it.toUrls().forEach{ add(it) } }
-    }.toTypedArray()
+    }.toTypedArray().apply { project.logger.debug("Classpath for generator: ${Arrays.toString(this)}") }
   }
 
 }
@@ -152,8 +164,16 @@ class CodegenPlugin : Plugin<Project> {
     val javaBasePlugin = project.plugins.apply(JavaBasePlugin::class.java)
     project.plugins.apply(JavaPlugin::class.java)
 
+    val sourceSetsToSkip = mutableSetOf<String>("generators")
     val sourceSets = project.sourceSets.all {sourceSet ->
-      processSourceSet(project, sourceSet)
+      if (! sourceSetsToSkip.contains(sourceSet.name)) {
+        if (sourceSet.name.endsWith("enerators")) {
+          project.logger.error("Generators sourceSet (${sourceSet.name}) not registered in ${sourceSetsToSkip}")
+        }else {
+          processSourceSet(project, sourceSet, sourceSetsToSkip)
+          project.logger.debug("sourceSetsToSkip is now: ${sourceSetsToSkip}")
+        }
+      }
 
     }
 
@@ -163,12 +183,16 @@ class CodegenPlugin : Plugin<Project> {
 //    project.logger.lifecycle("Welcome to the kotlinsql builder plugin")
   }
 
-  private fun processSourceSet(project: Project, sourceSet: SourceSet) {
+  private fun processSourceSet(project: Project, sourceSet: SourceSet, doSkip:MutableSet<String>) {
     val generateTaskName = if (sourceSet.name == "main") "generate" else sourceSet.getTaskName("generate", null)
-    val cleanTaskName = if (sourceSet.name == "main") "${BasePlugin.CLEAN_TASK_NAME} Generate" else sourceSet.getTaskName(BasePlugin.CLEAN_TASK_NAME, "generate")
+    val cleanTaskName = if (sourceSet.name == "main") "${BasePlugin.CLEAN_TASK_NAME}Generate" else sourceSet.getTaskName(BasePlugin.CLEAN_TASK_NAME, "generate")
 
-    val configuration = project.configurations.create(generateTaskName)
-    project.configurations.add(configuration)
+    val generateConfiguration = project.configurations.create(generateTaskName)
+    project.configurations.add(generateConfiguration)
+
+    val generatorSourceSetName = if (sourceSet.name == "main") "generators" else "${sourceSet.name}Generators"
+    doSkip.add(generatorSourceSetName)
+    val generatorSourceSet = project.sourceSets.maybeCreate(generatorSourceSetName)
 
     val generateExt = project.container(GenerateSpec::class.java)
     if (sourceSet is HasConvention) {
@@ -180,15 +204,17 @@ class CodegenPlugin : Plugin<Project> {
     val outputDir = project.file("gen/${sourceSet.name}")
 
     val generateTask = project.tasks.create(generateTaskName, GenerateTask::class.java).apply {
-      dependsOn(configuration)
+      dependsOn(generateConfiguration)
+      dependsOn(generatorSourceSet.classesTaskName)
+      classpath = project.files(generateConfiguration, generatorSourceSet.runtimeClasspath)
       this.outputDir = outputDir
       container = generateExt
     }
 
-    configuration.files (object : Closure<Any>(this) {
+    generateConfiguration.files (object : Closure<Any>(this) {
       override fun call() = generateTask.outputDir
     })
-    project.dependencies.add(sourceSet.compileConfigurationName, project.files(Callable { configuration.files }))
+    project.dependencies.add(sourceSet.compileConfigurationName, project.files(Callable { generateConfiguration.files }))
 
     // Late bind the actual output directory
     sourceSet.java.srcDir(Callable { generateTask.outputDir })
