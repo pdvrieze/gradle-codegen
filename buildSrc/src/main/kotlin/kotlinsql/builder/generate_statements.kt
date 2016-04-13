@@ -28,8 +28,10 @@ import net.devrieze.gradlecodgen.GenerateImpl
 import org.gradle.api.file.FileCollection
 import java.io.Writer
 
-class GenerateStatementsKt(val count:Int): GenerateImpl {
-  override fun doGenerate(output: Writer, input: FileCollection?) {
+class GenerateStatementsKt {
+  fun doGenerate(output: Writer, input: Any) {
+    val count = input as Int
+
     output.apply {
       appendCopyright()
       appendln()

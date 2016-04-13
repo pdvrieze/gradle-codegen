@@ -28,8 +28,9 @@ import net.devrieze.gradlecodgen.GenerateImpl
 import org.gradle.api.file.FileCollection
 import java.io.Writer
 
-class GenerateDatabaseBaseKt(val count:Int): GenerateImpl {
-  override fun doGenerate(output: Writer, input: FileCollection?) {
+class GenerateDatabaseBaseKt() {
+  fun doGenerate(output: Writer, input: Any) {
+    val count =  input as Int
     output.apply {
 
       appendCopyright()
@@ -43,15 +44,15 @@ class GenerateDatabaseBaseKt(val count:Int): GenerateImpl {
       appendln("open class DatabaseMethods {")
 //      appendln("  companion object {")
 
-      appendFunctionGroup("SELECT","_Select")
-      appendFunctionGroup("INSERT","_Insert")
+      appendFunctionGroup("SELECT","_Select", count)
+      appendFunctionGroup("INSERT","_Insert", count)
 
 //      appendln("  }")
       appendln("}")
     }
   }
 
-  private fun Writer.appendFunctionGroup(funName:String, className:String) {
+  private fun Writer.appendFunctionGroup(funName: String, className: String, count: Int) {
     for (n in 1..count) {
       appendln()
   //        appendln("    @JvmStatic")

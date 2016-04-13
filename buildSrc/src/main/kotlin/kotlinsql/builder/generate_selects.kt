@@ -28,8 +28,9 @@ import net.devrieze.gradlecodgen.GenerateImpl
 import org.gradle.api.file.FileCollection
 import java.io.Writer
 
-class GenerateSelectClasses(val count:Int): GenerateImpl {
-  override fun doGenerate(output: Writer, input: FileCollection?) {
+class GenerateSelectClasses {
+  fun doGenerate(output: Writer, input: Any) {
+    val count = input as Int
     output.apply {
       appendCopyright()
       appendln()
