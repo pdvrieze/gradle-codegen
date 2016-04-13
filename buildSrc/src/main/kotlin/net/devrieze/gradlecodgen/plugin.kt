@@ -78,7 +78,7 @@ open class GenerateTask: DefaultTask() {
           } else {
             project.logger.lifecycle("Generating ${spec.name} as '${spec.output}'")
           }
-          spec.generator?.let { gname ->
+          if (spec.generator!=null) { val gname = spec.generator
             val generatorClass = classLoader.loadClass(gname)
             val generatorInst = generatorClass.newInstance()
             if (! outFile.isFile) {
@@ -94,7 +94,7 @@ open class GenerateTask: DefaultTask() {
               }
             }
 
-          } ?: logger.quiet("Missing output code for generateSpec ${spec.name}")
+          } else { logger.quiet("Missing output code for generateSpec ${spec.name}, no generator provided") }
         }
       }
     }
