@@ -61,6 +61,12 @@ open class GenerateTask: DefaultTask() {
 
   var classpath: FileCollection? = null
 
+  val dirGenerator = GenerateDirSpec()
+
+  fun dirGenerator(closure: Closure<Any?>?) {
+    ConfigureUtil.configure(closure, dirGenerator)
+  }
+
   @Input
   internal var container: NamedDomainObjectContainer<GenerateSpec>? = null
 
@@ -70,17 +76,44 @@ open class GenerateTask: DefaultTask() {
       container?.all { spec: GenerateSpec ->
         val specClasspath = spec.classpath
         if (specClasspath ==null || specClasspath.isEmpty) {
-          generateSpec(spec, joinedLoader)
+          generateFile(spec, joinedLoader)
         } else {
           URLClassLoader(combinedClasspath(spec.classpath)).use { classLoader ->
-            generateSpec(spec, classLoader)
+            generateFile(spec, classLoader)
           }
         }
       }
+
+      if (dirGenerator.generator!=null) {
+        val outDir = if (dirGenerator.outputDir ==null) project.file(outputDir) else File(project.file(outputDir),dirGenerator.outputDir)
+        outDir.mkdirs() // ensure the output directory exists
+        if (dirGenerator.classpath!=null) {
+          URLClassLoader(combinedClasspath(dirGenerator.classpath)). use {
+            generateDir(outDir, it)
+          }
+        } else {
+          generateDir(outDir, joinedLoader)
+        }
+      }
+
     }
   }
 
-  private fun generateSpec(spec: GenerateSpec, classLoader: ClassLoader) {
+  private fun generateDir(outDir: File, classLoader: ClassLoader) {
+    val generatorClass = classLoader.loadClass(dirGenerator.generator)
+    val m = generatorClass.getGenerateDirMethod(dirGenerator.input)
+
+    val generatorInst = if (Modifier.isStatic(m.modifiers)) null else generatorClass.newInstance()
+    if (m.parameterCount==1) {
+      m.invoke(generatorInst, outDir)
+    } else {
+      m.invoke(generatorInst, outDir, dirGenerator.input)
+    }
+
+  }
+
+
+  private fun generateFile(spec: GenerateSpec, classLoader: ClassLoader) {
     if (spec.output != null) {
       val outFile = File(project.file(outputDir), spec.output)
 
@@ -92,12 +125,13 @@ open class GenerateTask: DefaultTask() {
       if (spec.generator != null) {
         val gname = spec.generator
         val generatorClass = classLoader.loadClass(gname)
-        val generatorInst = generatorClass.newInstance()
         if (!outFile.isFile) {
           outFile.parentFile.mkdirs()
           outFile.createNewFile()
         }
+
         val m = generatorClass.getGenerateMethod(spec.input)
+        val generatorInst = if (Modifier.isStatic(m.modifiers)) null else generatorClass.newInstance()
         outFile.writer().use { writer ->
           if (m.parameterCount == 2) {
             m.invoke(generatorInst, writer, spec.input)
@@ -120,7 +154,29 @@ open class GenerateTask: DefaultTask() {
         .filter { Appendable::class.java.isAssignableFrom(it.parameterTypes[0]) && it.parameterTypes[0].isAssignableFrom(Writer::class.java) }
         .filter { if (it.parameterCount==1) true else  it.parameterTypes[1].isInstance(input) }
         .singleOrNull() ?: throw NoSuchMethodError("Generators must have a unique public method \"doGenerate(Appendable|Writer, " +
-                "[Object])\" where the second parameter is optional iff the input is null" )
+                "[Object])\" where the second parameter is optional iff the input is null. If not a static method," +
+                "the class must have a noArg constructor" )
+  }
+
+  private fun Class<*>.getGenerateDirMethod(input: Any?):Method {
+    return methods.asSequence()
+        .filter { it.name=="doGenerate" }
+        .filter { Modifier.isPublic(it.modifiers) }
+        .filter { if (input==null) it.parameterCount in 1..2 else it.parameterCount==2 }
+        .let {
+          val candidates = it.toList()
+          candidates.filter { (File::class.java==it.parameterTypes[0].apply { project.logger.debug("Rejecting $it as the first parameter is not a file") }) }
+              .filter { if (it.parameterCount==1) true else  it.parameterTypes[1].isInstance(input) }
+              .singleOrNull() ?: throw NoSuchMethodError("""
+              Generators must have a unique public method "doGenerate(File, [Object])"
+              where the second parameter is optional iff the input is null. If not a static
+              method, the class must have a noArg constructor.
+
+              Candidates were:
+                  ${candidates.joinToString("\n    ") { it.toString() }}
+              """.trimIndent() )
+
+        }
   }
 
   private fun combinedClasspath(others: FileCollection?): Array<out URL>? {
@@ -140,7 +196,7 @@ public const val OUTPUT_SOURCE_SET = "generatedSources"
 public const val DEFAULT_GEN_DIR = "gen"
 
 interface GenerateImpl {
-  fun doGenerate(output: Writer, input: Iterable<out File>?)
+  fun doGenerate(output: Writer, input: Iterable<File>?)
 }
 
 class GenerateSpec(val name: String) {
@@ -150,7 +206,14 @@ class GenerateSpec(val name: String) {
   var input: Any?=null
 }
 
-open class GenerateSourceSet(val name:String, val generate: NamedDomainObjectContainer<GenerateSpec>) {
+class GenerateDirSpec() {
+  var input: Any?=null
+  var generator: String?=null
+  var classpath: FileCollection? = null
+  var outputDir: String?=null
+}
+
+open class GenerateSourceSet(val generate: NamedDomainObjectContainer<GenerateSpec>) {
 
   fun generate(configureClosure: Closure<Any?>?): GenerateSourceSet {
     ConfigureUtil.configure(configureClosure, generate)
@@ -161,11 +224,10 @@ open class GenerateSourceSet(val name:String, val generate: NamedDomainObjectCon
 class CodegenPlugin : Plugin<Project> {
 
   override fun apply(project: Project) {
-    val javaBasePlugin = project.plugins.apply(JavaBasePlugin::class.java)
-    project.plugins.apply(JavaPlugin::class.java)
+    project.plugins.apply(JavaBasePlugin::class.java)
 
     val sourceSetsToSkip = mutableSetOf<String>("generators")
-    val sourceSets = project.sourceSets.all {sourceSet ->
+    project.sourceSets.all {sourceSet ->
       if (! sourceSetsToSkip.contains(sourceSet.name)) {
         if (sourceSet.name.endsWith("enerators")) {
           project.logger.error("Generators sourceSet (${sourceSet.name}) not registered in ${sourceSetsToSkip}")
@@ -196,7 +258,7 @@ class CodegenPlugin : Plugin<Project> {
 
     val generateExt = project.container(GenerateSpec::class.java)
     if (sourceSet is HasConvention) {
-      sourceSet.convention.plugins.put("net.devrieze.gradlecodegen", GenerateSourceSet("generate", generateExt))
+      sourceSet.convention.plugins.put("net.devrieze.gradlecodegen", GenerateSourceSet(generateExt))
     } else {
       project.extensions.add(generateTaskName, generateExt)
     }

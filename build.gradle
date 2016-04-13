@@ -22,13 +22,16 @@
 buildscript {
 
     ext {
-        if (! rootProject.ext.has('kotlin_version') ) { kotlin_version = '1.0.1-2' }
+        if (!rootProject.ext.has('kotlin_version')) {
+            kotlin_version = '1.0.1-2'
+        }
     }
     dependencies {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 
     repositories {
+        mavenLocal()
         jcenter()
         maven {
             url "https://plugins.gradle.org/m2"
@@ -38,17 +41,18 @@ buildscript {
 
 
 plugins {
-    id "com.jfrog.bintray" version "1.6"
     id "com.gradle.plugin-publish" version "0.9.4"
+    id "com.jfrog.bintray" version "1.6"
+    id 'maven-publish'
 }
 
 apply plugin: 'kotlin'
-apply plugin: 'maven-publish'
+//apply plugin: 'maven-publish'
 
 sourceCompatibility = JavaVersion.VERSION_1_6
 targetCompatibility = JavaVersion.VERSION_1_6
 
-version = '0.5.1'
+version = '0.5.5'
 group = 'net.devrieze'
 
 bintray {
@@ -67,8 +71,8 @@ bintray {
             name = project.version
             desc = 'Fixed when not using kotlin. Kotlin is now optionally supported.'
             released = new Date()
-            vcsTag = 'v0.5.1'
-//            attributes = [ 'gradle-plugin': 'net.devrieze.gradlecodegen:' ]
+            vcsTag = "v$version"
+            attributes = [ 'gradle-plugin': 'net.devrieze:gradle-codegen:net.devrieze.gradlecodegen' ]
         }
     }
 }
@@ -79,7 +83,7 @@ publishing {
             from components.java
             groupId group
             artifactId 'gradle-codegen'
-            
+
             artifact sourceJar {
                 classifier "sources"
             }
@@ -91,16 +95,18 @@ pluginBundle {
     website = 'https://github.com/pdvrieze/gradle-codegen.git'
     vcsUrl = 'https://github.com/pdvrieze/gradle-codegen.git'
     description = "A plugin to aid with codeGeneration without using buildSrc. It provides an additional generate section to sourceSets. In this section individual files to be generated can be specified. Each sourceset has an accompanying ...generator sourceSet where the actual generator source can live."
-    tags = [ 'generate', 'codegen', 'code-generation' ]
+    tags = ['generate', 'codegen', 'code-generation']
+
     plugins {
         gradlecodegen {
             id = 'net.devrieze.gradlecodegen'
             displayName = 'Code generation plugin for gradle'
         }
     }
+
     mavenCoordinates {
         groupId = group
-	artifactId = "gradle-codegen"
+        artifactId = "gradle-codegen"
     }
 }
 
@@ -109,7 +115,7 @@ dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 }
 
-task sourceJar(type:Jar) {
+task sourceJar(type: Jar) {
     from sourceSets.main.allSource
 }
 

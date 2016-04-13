@@ -1,3 +1,6 @@
-0.5: Initial release
+0.5.5: Add an extension to the generate task that allows directory wide generation
+       of unspecified. files. This is mainly useful for annotation processing.
 
 0.5.1: Don't have a hard dependency on kotlin.
+
+0.5: Initial release
