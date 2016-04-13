@@ -30,11 +30,15 @@ buildscript {
 
     repositories {
         jcenter()
+        maven {
+            url "https://plugins.gradle.org/m2"
+        }
     }
 }
 
 plugins {
     id "com.jfrog.bintray" version "1.6"
+    id "com.gradle.plugin-publish" version "0.9.4"
 }
 
 apply plugin: 'kotlin'
@@ -43,7 +47,8 @@ apply plugin: 'maven-publish'
 sourceCompatibility = JavaVersion.VERSION_1_6
 targetCompatibility = JavaVersion.VERSION_1_6
 
-version '0.5'
+version = '0.5'
+group = 'net.devrieze'
 
 bintray {
     user = bintrayUser
@@ -71,13 +76,30 @@ publishing {
     publications {
         MyPublication(MavenPublication) {
             from components.java
-            groupId 'net.devrieze'
+            groupId group
             artifactId 'gradle-codegen'
             
             artifact sourceJar {
                 classifier "sources"
             }
         }
+    }
+}
+
+pluginBundle {
+    website = 'https://github.com/pdvrieze/gradle-codegen.git'
+    vcsUrl = 'https://github.com/pdvrieze/gradle-codegen.git'
+    description = "A plugin to aid with codeGeneration without using buildSrc. It provides an additional generate section to sourceSets. In this section individual files to be generated can be specified. Each sourceset has an accompanying ...generator sourceSet where the actual generator source can live."
+    tags = [ 'generate', 'codegen', 'code-generation' ]
+    plugins {
+        gradlecodegen {
+            id = 'net.devrieze.gradlecodegen'
+            displayName = 'Code generation plugin for gradle'
+        }
+    }
+    mavenCoordinates {
+        groupId = group
+	artifactId = "gradle-codegen"
     }
 }
 
