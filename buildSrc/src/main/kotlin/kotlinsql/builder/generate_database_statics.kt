@@ -24,6 +24,7 @@
 
 package kotlinsql.builder
 
+import net.devrieze.gradlecodgen.GenerateImpl
 import org.gradle.api.file.FileCollection
 import java.io.Writer
 

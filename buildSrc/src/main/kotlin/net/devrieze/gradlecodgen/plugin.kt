@@ -18,7 +18,7 @@
  * under the License.
  */
 
-package kotlinsql.builder
+package net.devrieze.gradlecodgen
 
 import groovy.lang.Closure
 import org.gradle.api.DefaultTask
@@ -43,7 +43,7 @@ import java.util.concurrent.Callable
 val Project.sourceSets: SourceSetContainer
   get() = project.convention.getPlugin(JavaPluginConvention::class.java).sourceSets
 
-operator fun SourceSetContainer.get(name:String):SourceSet = getByName(name)
+operator fun SourceSetContainer.get(name:String): SourceSet = getByName(name)
 
 open class GenerateTask: DefaultTask() {
 
@@ -110,7 +110,7 @@ class GenerateSpec(val name: String) {
   var input: Any?=null
 }
 
-open class GenerateSourceSet(val name:String, val generate:NamedDomainObjectContainer<GenerateSpec>) {
+open class GenerateSourceSet(val name:String, val generate: NamedDomainObjectContainer<GenerateSpec>) {
 
   fun generate(configureClosure: Closure<Any?>?): GenerateSourceSet {
     ConfigureUtil.configure(configureClosure, generate)
@@ -146,11 +146,11 @@ class BuilderPlugin: Plugin<Project> {
         container = generateExt
       }
 
-      configuration.files ( object:Closure<Any>(this){ override fun call()= generateTask.outputDir })
-      project.dependencies.add(sourceSet.compileConfigurationName, project.files(Callable{configuration.files}))
+      configuration.files ( object: Closure<Any>(this){ override fun call()= generateTask.outputDir })
+      project.dependencies.add(sourceSet.compileConfigurationName, project.files(Callable { configuration.files }))
 
       // Late bind the actual output directory
-      sourceSet.java.srcDir(Callable{generateTask.outputDir})
+      sourceSet.java.srcDir(Callable { generateTask.outputDir })
 
 
       val cleanTask = project.tasks.create(cleanTaskName) { clean ->
