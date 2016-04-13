@@ -21,12 +21,12 @@
 package net.devrieze.gradlecodegen
 
 import groovy.lang.Closure
-import org.gradle.api.DefaultTask
-import org.gradle.api.NamedDomainObjectContainer
-import org.gradle.api.Plugin
-import org.gradle.api.Project
+import org.gradle.api.*
 import org.gradle.api.file.FileCollection
 import org.gradle.api.internal.HasConvention
+import org.gradle.api.internal.tasks.DefaultSourceSetOutput
+import org.gradle.api.internal.tasks.TaskDependencyInternal
+import org.gradle.api.internal.tasks.TaskDependencyResolveContext
 import org.gradle.api.plugins.BasePlugin
 import org.gradle.api.plugins.JavaBasePlugin
 import org.gradle.api.plugins.JavaPlugin
@@ -214,6 +214,7 @@ class CodegenPlugin : Plugin<Project> {
     generateConfiguration.files (object : Closure<Any>(this) {
       override fun call() = generateTask.outputDir
     })
+
     project.dependencies.add(sourceSet.compileConfigurationName, project.files(Callable { generateConfiguration.files }))
 
     // Late bind the actual output directory
@@ -226,13 +227,39 @@ class CodegenPlugin : Plugin<Project> {
       clean.doFirst { project.delete(outputDir) }
     }
 
-    project.tasks.getByName(sourceSet.compileJavaTaskName).dependsOn.add(generateTask)
-    project.tasks.getByName(sourceSet.getCompileTaskName("kotlin")).dependsOn(generateTask)
+    project.configurations.getByName(sourceSet.compileConfigurationName).extendsFrom(generateConfiguration)
+
+    addGenerateTaskAsDependency(generateTask, generateTaskName, project, sourceSet)
 
     project.afterEvaluate {
       project.extensions.getByType(IdeaModel::class.java)?.let { ideaModel ->
         ideaModel.module.generatedSourceDirs.add(project.file(generateTask.outputDir))
       }
+    }
+  }
+
+  private fun addGenerateTaskAsDependency(generateTask: GenerateTask, generateTaskName: String, project: Project, sourceSet: SourceSet) {
+    val classesTask = project.tasks.findByName(sourceSet.classesTaskName)
+    val tasks = mutableListOf<Task>()
+    val depVisitor = object : TaskDependencyResolveContext {
+      override fun add(dependency: Any) {
+        when (dependency) {
+          is Task -> tasks.add(dependency)
+          is TaskDependency -> dependency.getDependencies(classesTask).forEach { dep -> tasks.add(dep) }
+          is Buildable -> dependency.buildDependencies.getDependencies(classesTask).forEach { dep -> tasks.add(dep) }
+          else -> project.logger.warn("Unsupported dependency type: ${dependency.javaClass}")
+        }
+      }
+
+      override fun getTask() = classesTask
+    }
+    (classesTask.taskDependencies as TaskDependencyInternal).visitDependencies(depVisitor)
+    // Hack to just add it to the kotlin dependency set.
+    project.tasks.findByName(sourceSet.getCompileTaskName("kotlin"))?.let { if (!tasks.contains(it)) {tasks.add(it)} }
+
+    tasks.forEach { task ->
+      task.dependsOn(generateTask)
+      project.logger.debug("Make task ${task.name} depend on $generateTaskName")
     }
   }
 }
