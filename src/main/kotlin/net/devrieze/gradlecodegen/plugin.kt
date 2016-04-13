@@ -18,7 +18,7 @@
  * under the License.
  */
 
-package net.devrieze.gradlecodgen
+package net.devrieze.gradlecodegen
 
 import groovy.lang.Closure
 import org.gradle.api.DefaultTask
