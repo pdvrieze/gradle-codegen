@@ -69,7 +69,7 @@ bintray {
 
 publishing {
     publications {
-        MyPublications(MavenPublication) {
+        MyPublication(MavenPublication) {
             from components.java
             groupId 'net.devrieze'
             artifactId 'gradle-codegen'
