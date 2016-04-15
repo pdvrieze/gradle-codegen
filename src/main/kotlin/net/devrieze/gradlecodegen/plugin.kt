@@ -277,7 +277,7 @@ class CodegenPlugin : Plugin<Project> {
       override fun call() = generateTask.outputDir
     })
 
-    project.dependencies.add(sourceSet.compileConfigurationName, project.files(Callable { generateConfiguration.files }))
+    project.dependencies.add(sourceSet.compileConfigurationName, project.files(Callable { generateConfiguration.files }).apply { builtBy(generateTask) })
 
     // Late bind the actual output directory
     sourceSet.java.srcDir(Callable { generateTask.outputDir })
@@ -291,8 +291,6 @@ class CodegenPlugin : Plugin<Project> {
 
     project.configurations.getByName(sourceSet.compileConfigurationName).extendsFrom(generateConfiguration)
 
-    addGenerateTaskAsDependency(generateTask, generateTaskName, project, sourceSet)
-
     project.afterEvaluate {
       project.extensions.getByType(IdeaModel::class.java)?.let { ideaModel ->
         ideaModel.module.generatedSourceDirs.add(project.file(generateTask.outputDir))
@@ -300,28 +298,4 @@ class CodegenPlugin : Plugin<Project> {
     }
   }
 
-  private fun addGenerateTaskAsDependency(generateTask: GenerateTask, generateTaskName: String, project: Project, sourceSet: SourceSet) {
-    val classesTask = project.tasks.findByName(sourceSet.classesTaskName)
-    val tasks = mutableListOf<Task>()
-    val depVisitor = object : TaskDependencyResolveContext {
-      override fun add(dependency: Any) {
-        when (dependency) {
-          is Task -> tasks.add(dependency)
-          is TaskDependency -> dependency.getDependencies(classesTask).forEach { dep -> tasks.add(dep) }
-          is Buildable -> dependency.buildDependencies.getDependencies(classesTask).forEach { dep -> tasks.add(dep) }
-          else -> project.logger.warn("Unsupported dependency type: ${dependency.javaClass}")
-        }
-      }
-
-      override fun getTask() = classesTask
-    }
-    (classesTask.taskDependencies as TaskDependencyInternal).visitDependencies(depVisitor)
-    // Hack to just add it to the kotlin dependency set.
-    project.tasks.findByName(sourceSet.getCompileTaskName("kotlin"))?.let { if (!tasks.contains(it)) {tasks.add(it)} }
-
-    tasks.forEach { task ->
-      task.dependsOn(generateTask)
-      project.logger.debug("Make task ${task.name} depend on $generateTaskName")
-    }
-  }
 }

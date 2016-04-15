@@ -1,3 +1,6 @@
+0.5.6: Make the dependency work properly, by add a builtBy to the files needed by the compile Configuration. No more
+       guessing of alternative language task names.
+
 0.5.5: Add an extension to the generate task that allows directory wide generation
        of unspecified. files. This is mainly useful for annotation processing.
 
