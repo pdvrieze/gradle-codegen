@@ -34,6 +34,7 @@ import org.gradle.api.plugins.JavaPluginConvention
 import org.gradle.api.tasks.*
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.gradle.util.ConfigureUtil
+import org.jetbrains.annotations.NotNull
 import java.io.File
 import java.io.StringWriter
 import java.io.Writer
@@ -155,16 +156,24 @@ open class GenerateTask: DefaultTask() {
           val candidates = it.toList()
           candidates.asSequence()
               .filter { Appendable::class.java.isAssignableFrom(it.parameterTypes[0]) && it.parameterTypes[0].isAssignableFrom(Writer::class.java) }
-              .filter { if (it.parameterCount==1) true else  it.parameterTypes[1].isInstance(input) }
+              .filter { if (it.parameterCount==1) true else  (isSecondParameterCompatible(input, it)) }
               .singleOrNull() ?: throw  NoSuchMethodError("""
-              Generators must have a unique public method "doGenerate(Writer|Appendable, [Object])"\n
-              where the second parameter is optional iff the input is null. If not a static\n
-              method, the class must have a noArg constructor.\n
+              Generators must have a unique public method "doGenerate(Writer|Appendable, [Object])"
+              where the second parameter is optional iff the input is null. If not a static
+              method, the class must have a noArg constructor.
 
-              Candidates were:\n
-                  ${candidates.joinToString("\n    ") { it.toString() }}
+              Candidates were: (with input = ${input?.javaClass?.name?:"null"}):
+                  ${candidates.joinToString("\n${" ".repeat(18)}") { it.toString() }}
               """.trimIndent() )
         }
+  }
+
+  private fun isSecondParameterCompatible(input: Any?, method: Method): Boolean {
+    if (input==null) {
+      return (method.parameterAnnotations[1].none { annotation -> annotation is NotNull })
+    } else {
+      return method.parameterTypes[1].isInstance(input)
+    }
   }
 
   private fun Class<*>.getGenerateDirMethod(input: Any?):Method {
@@ -175,13 +184,13 @@ open class GenerateTask: DefaultTask() {
         .let {
           val candidates = it.toList()
           candidates.asSequence().filter { (File::class.java==it.parameterTypes[0].apply { project.logger.debug("Rejecting $it as the first parameter is not a file") }) }
-              .filter { if (it.parameterCount==1) true else  input==null || it.parameterTypes[1].isInstance(input) }
+              .filter { if (it.parameterCount==1) true else  isSecondParameterCompatible(input, it) }
               .singleOrNull() ?: throw NoSuchMethodError("""
-              Generators must have a unique public method "doGenerate(File, [Object])"\n
-              where the second parameter is optional iff the input is null. If not a static\n
-              method, the class must have a noArg constructor.\n
+              Generators must have a unique public method "doGenerate(File, [Object])"
+              where the second parameter is optional iff the input is null. If not a static
+              method, the class must have a noArg constructor.
 
-              Candidates were (with input = ${input?.javaClass?.name?:"null"}:\n
+              Candidates were (with input = ${input?.javaClass?.name?:"null"}):
                   ${candidates.joinToString("\n    ") { it.toString() }}
               """.trimIndent() )
 
