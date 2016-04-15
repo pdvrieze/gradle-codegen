@@ -151,11 +151,20 @@ open class GenerateTask: DefaultTask() {
         .filter { it.name=="doGenerate" }
         .filter { Modifier.isPublic(it.modifiers) }
         .filter { if (input==null) it.parameterCount in 1..2 else it.parameterCount==2 }
-        .filter { Appendable::class.java.isAssignableFrom(it.parameterTypes[0]) && it.parameterTypes[0].isAssignableFrom(Writer::class.java) }
-        .filter { if (it.parameterCount==1) true else  it.parameterTypes[1].isInstance(input) }
-        .singleOrNull() ?: throw NoSuchMethodError("Generators must have a unique public method \"doGenerate(Appendable|Writer, " +
-                "[Object])\" where the second parameter is optional iff the input is null. If not a static method," +
-                "the class must have a noArg constructor" )
+        .let {
+          val candidates = it.toList()
+          candidates.asSequence()
+              .filter { Appendable::class.java.isAssignableFrom(it.parameterTypes[0]) && it.parameterTypes[0].isAssignableFrom(Writer::class.java) }
+              .filter { if (it.parameterCount==1) true else  it.parameterTypes[1].isInstance(input) }
+              .singleOrNull() ?: throw  NoSuchMethodError("""
+              Generators must have a unique public method "doGenerate(Writer|Appendable, [Object])"\n
+              where the second parameter is optional iff the input is null. If not a static\n
+              method, the class must have a noArg constructor.\n
+
+              Candidates were:\n
+                  ${candidates.joinToString("\n    ") { it.toString() }}
+              """.trimIndent() )
+        }
   }
 
   private fun Class<*>.getGenerateDirMethod(input: Any?):Method {
@@ -165,14 +174,14 @@ open class GenerateTask: DefaultTask() {
         .filter { if (input==null) it.parameterCount in 1..2 else it.parameterCount==2 }
         .let {
           val candidates = it.toList()
-          candidates.filter { (File::class.java==it.parameterTypes[0].apply { project.logger.debug("Rejecting $it as the first parameter is not a file") }) }
-              .filter { if (it.parameterCount==1) true else  it.parameterTypes[1].isInstance(input) }
+          candidates.asSequence().filter { (File::class.java==it.parameterTypes[0].apply { project.logger.debug("Rejecting $it as the first parameter is not a file") }) }
+              .filter { if (it.parameterCount==1) true else  input==null || it.parameterTypes[1].isInstance(input) }
               .singleOrNull() ?: throw NoSuchMethodError("""
-              Generators must have a unique public method "doGenerate(File, [Object])"
-              where the second parameter is optional iff the input is null. If not a static
-              method, the class must have a noArg constructor.
+              Generators must have a unique public method "doGenerate(File, [Object])"\n
+              where the second parameter is optional iff the input is null. If not a static\n
+              method, the class must have a noArg constructor.\n
 
-              Candidates were:
+              Candidates were (with input = ${input?.javaClass?.name?:"null"}:\n
                   ${candidates.joinToString("\n    ") { it.toString() }}
               """.trimIndent() )
 
@@ -249,33 +258,27 @@ class CodegenPlugin : Plugin<Project> {
     val generateTaskName = if (sourceSet.name == "main") "generate" else sourceSet.getTaskName("generate", null)
     val cleanTaskName = if (sourceSet.name == "main") "${BasePlugin.CLEAN_TASK_NAME}Generate" else sourceSet.getTaskName(BasePlugin.CLEAN_TASK_NAME, "generate")
 
-    val generateConfiguration = project.configurations.create(generateTaskName)
+    val generateConfiguration = project.configurations.maybeCreate(generateTaskName)
     project.configurations.add(generateConfiguration)
 
     val generatorSourceSetName = if (sourceSet.name == "main") "generators" else "${sourceSet.name}Generators"
     doSkip.add(generatorSourceSetName)
+
     val generatorSourceSet = project.sourceSets.maybeCreate(generatorSourceSetName)
 
-    val generateExt = project.container(GenerateSpec::class.java)
-    if (sourceSet is HasConvention) {
-      sourceSet.convention.plugins.put("net.devrieze.gradlecodegen", GenerateSourceSet(generateExt))
-    } else {
-      project.extensions.add(generateTaskName, generateExt)
-    }
+    val generateExt = createConfigurationExtension(project, sourceSet, generateTaskName)
 
     val outputDir = project.file("gen/${sourceSet.name}")
 
     val generateTask = project.tasks.create(generateTaskName, GenerateTask::class.java).apply {
-      dependsOn(generateConfiguration)
-      dependsOn(generatorSourceSet.classesTaskName)
-      classpath = project.files(generateConfiguration, generatorSourceSet.runtimeClasspath)
+      dependsOn(Callable { generateConfiguration })
+      dependsOn(Callable { generatorSourceSet.classesTaskName })
+      classpath = project.files(Callable {generateConfiguration} , Callable { generatorSourceSet.runtimeClasspath } )
       this.outputDir = outputDir
       container = generateExt
     }
 
-    generateConfiguration.files (object : Closure<Any>(this) {
-      override fun call() = generateTask.outputDir
-    })
+    project.afterEvaluate { generateConfiguration.files (closure { generateTask.outputDir }) }
 
     project.dependencies.add(sourceSet.compileConfigurationName, project.files(Callable { generateConfiguration.files }).apply { builtBy(generateTask) })
 
@@ -298,4 +301,21 @@ class CodegenPlugin : Plugin<Project> {
     }
   }
 
+  private fun createConfigurationExtension(project: Project, sourceSet: SourceSet, generateTaskName: String?): NamedDomainObjectContainer<GenerateSpec>? {
+    val generateExt = project.container(GenerateSpec::class.java)
+    if (sourceSet is HasConvention) {
+      sourceSet.convention.plugins.put("net.devrieze.gradlecodegen", GenerateSourceSet(generateExt))
+    } else {
+      project.extensions.add(generateTaskName, generateExt)
+    }
+    return generateExt
+  }
+
+}
+
+private fun<T> closure(block:(args:Array<out Any?>)->T): Closure<T> = object:Closure<T>(Unit) {
+
+  override fun call(vararg args: Any?): T {
+    return block(args)
+  }
 }

@@ -1,3 +1,6 @@
+0.5.7: Resolve most things lazilly. In particularly only set the "files" for the generate
+       configuration afterwards.
+
 0.5.6: Make the dependency work properly, by add a builtBy to the files needed by the compile Configuration. No more
        guessing of alternative language task names.
 
