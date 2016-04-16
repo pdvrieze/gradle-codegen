@@ -52,7 +52,7 @@ apply plugin: 'kotlin'
 sourceCompatibility = JavaVersion.VERSION_1_6
 targetCompatibility = JavaVersion.VERSION_1_6
 
-version = '0.5.7'
+version = '0.5.8'
 group = 'net.devrieze'
 
 bintray {
@@ -117,6 +117,12 @@ dependencies {
 
 task sourceJar(type: Jar) {
     from sourceSets.main.allSource
+}
+
+task publishAll {
+    group "publishing"
+    dependsOn(bintrayUpload)
+    dependsOn(publishPlugins)
 }
 
 repositories {

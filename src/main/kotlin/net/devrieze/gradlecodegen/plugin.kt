@@ -44,6 +44,7 @@ import java.net.URL
 import java.net.URLClassLoader
 import java.util.*
 import java.util.concurrent.Callable
+import kotlin.reflect.KClass
 
 val Project.sourceSets: SourceSetContainer
   get() = project.convention.getPlugin(JavaPluginConvention::class.java).sourceSets
@@ -86,8 +87,7 @@ open class GenerateTask: DefaultTask() {
       }
 
       if (dirGenerator.generator!=null) {
-        val outDir = if (dirGenerator.outputDir ==null) project.file(outputDir) else File(project.file(outputDir),dirGenerator.outputDir)
-        outDir.mkdirs() // ensure the output directory exists
+        val outDir = if (dirGenerator.outputDir ==null) project.file(outputDir) else resolveFile(project.file(outputDir),dirGenerator.outputDir!!)
         if (dirGenerator.classpath!=null) {
           URLClassLoader(combinedClasspath(dirGenerator.classpath)). use {
             generateDir(outDir, it)
@@ -101,71 +101,114 @@ open class GenerateTask: DefaultTask() {
   }
 
   private fun generateDir(outDir: File, classLoader: ClassLoader) {
+    if (! outDir.exists()) {
+      if (!outDir.mkdirs()) throw InvalidUserDataException("The output directory $outDir could not be created")
+    } // ensure the output directory exists
+    if (!outDir.canWrite()) throw InvalidUserDataException("The output directory $outDir is not writeable")
+
     val generatorClass = classLoader.loadClass(dirGenerator.generator)
-    val m = generatorClass.getGenerateDirMethod(dirGenerator.input)
 
-    val generatorInst = if (Modifier.isStatic(m.modifiers)) null else generatorClass.newInstance()
-    if (m.parameterCount==1) {
-      m.invoke(generatorInst, outDir)
-    } else {
-      m.invoke(generatorInst, outDir, dirGenerator.input)
-    }
+    val baseError = """
+              Directory generators must have a unique public method "doGenerate(File, [Object])"
+              where the second parameter is optional iff the input is null. If not a static
+              method, the class must have a noArg constructor. """.trimIndent()
 
+    generatorClass.execute(outDir, dirGenerator.input, baseError)
   }
 
+  private fun resolveFile(context:File, fileName:String):File {
+    return File(fileName).let {
+      if (it.isAbsolute) it
+      else File(project.file(outputDir), fileName)
+    }
+  }
 
   private fun generateFile(spec: GenerateSpec, classLoader: ClassLoader) {
     if (spec.output != null) {
-      val outFile = File(project.file(outputDir), spec.output)
+      val outFile = resolveFile(project.file(outputDir), spec.output!!)
 
-      if (project.logger.isInfoEnabled) {
-        project.logger.info("Generating ${spec.name} as '${spec.output}' as '${outFile}'")
-      } else {
-        project.logger.lifecycle("Generating ${spec.name} as '${spec.output}'")
-      }
       if (spec.generator != null) {
         val gname = spec.generator
         val generatorClass = classLoader.loadClass(gname)
-        if (!outFile.isFile) {
-          outFile.parentFile.mkdirs()
+        if (outFile.isDirectory) throw InvalidUserDataException("The output can not be a directory, it must be a file ($outFile)")
+        if (!outFile.exists()) {
+          outFile.parentFile.apply { if (! exists()) mkdirs() || throw InvalidUserDataException("The target directory for the output file $outFile could not be created")}
           outFile.createNewFile()
         }
+        if (!outFile.canWrite()) throw InvalidUserDataException("The output file ($outFile) is not writeable.")
 
-        val m = generatorClass.getGenerateMethod(spec.input)
-        val generatorInst = if (Modifier.isStatic(m.modifiers)) null else generatorClass.newInstance()
-        outFile.writer().use { writer ->
-          if (m.parameterCount == 2) {
-            m.invoke(generatorInst, writer, spec.input)
-          } else {
-            m.invoke(generatorInst, writer)
-          }
+        if (project.logger.isInfoEnabled) {
+          project.logger.info("Generating ${spec.name} as '${spec.output}' as '${outFile}'")
+        } else {
+          project.logger.lifecycle("Generating ${spec.name} as '${spec.output}'")
         }
 
+        val baseError = """
+              Generators must have a unique public method "doGenerate(Writer|Appendable, [Object])"
+              where the second parameter is optional iff the input is null. If not a static
+              method, the class must have a noArg constructor.""".trimIndent()
+
+        generatorClass.execute({outFile.writer()}, spec.input, baseError)
+
       } else {
-        logger.quiet("Missing output code for generateSpec ${spec.name}, no generator provided")
+        throw InvalidUserDataException("Missing output code for generateSpec ${spec.name}, no generator provided")
       }
     }
   }
 
-  private fun Class<*>.getGenerateMethod(input: Any?):Method {
+  private fun Class<*>.getGeneratorMethods(firstParamWriter: Boolean, input:Any?):List<Method> {
     return methods.asSequence()
         .filter { it.name=="doGenerate" }
         .filter { Modifier.isPublic(it.modifiers) }
         .filter { if (input==null) it.parameterCount in 1..2 else it.parameterCount==2 }
-        .let {
-          val candidates = it.toList()
-          candidates.asSequence()
-              .filter { Appendable::class.java.isAssignableFrom(it.parameterTypes[0]) && it.parameterTypes[0].isAssignableFrom(Writer::class.java) }
-              .filter { if (it.parameterCount==1) true else  (isSecondParameterCompatible(input, it)) }
-              .singleOrNull() ?: throw  NoSuchMethodError("""
-              Generators must have a unique public method "doGenerate(Writer|Appendable, [Object])"
-              where the second parameter is optional iff the input is null. If not a static
-              method, the class must have a noArg constructor.
+        .filter {
+          if(firstParamWriter) {
+            Appendable::class.java.isAssignableFrom(it.parameterTypes[0]) && it.parameterTypes[0].isAssignableFrom(Writer::class.java)
+          } else {
+            File::class.java==it.parameterTypes[0]
+          }
+        }.toList()
+  }
 
-              Candidates were: (with input = ${input?.javaClass?.name?:"null"}):
-                  ${candidates.joinToString("\n${" ".repeat(18)}") { it.toString() }}
-              """.trimIndent() )
+  private fun Class<out Any>.execute(firstParam: Any, input:Any?, baseErrorMsg:String) {
+    getGeneratorMethods(firstParam !is File, input).let { candidates ->
+      try {
+        var resolvedInput = input
+        var methodIterator = candidates
+            .asSequence()
+            .filter { if (it.parameterCount == 1) true else isSecondParameterCompatible(input, it) }
+            .iterator()
+
+        if (input is Callable<*> && !methodIterator.hasNext()) {
+          resolvedInput = input.call()
+          methodIterator = candidates.asSequence()
+              .filter { isSecondParameterCompatible(resolvedInput, it) }.iterator()
         }
+
+        if (! methodIterator.hasNext()) throw InvalidUserDataException(errorMsg("No candidate method found", candidates, baseErrorMsg, input))
+
+        val m = methodIterator.next()
+
+        if (methodIterator.hasNext()) { throw InvalidUserCodeException(ambiguousChoice(candidates, baseErrorMsg, input)) }
+        m.doInvoke(this, firstParam, resolvedInput)
+        return
+      } catch (e:Exception) {
+        throw InvalidUserDataException("Could not execute the generator code", e)
+      }
+    }
+  }
+
+  private fun ambiguousChoice(candidates: Iterable<Method>, baseErrorMsg: String, input:Any?): String {
+    return errorMsg("More than 1 valid candidate found.", candidates, baseErrorMsg, input)
+  }
+
+  private fun errorMsg(error:String, candidates: Iterable<Method>, baseErrorMsg: String, input:Any?): String {
+    return buildString {
+      appendln(error)
+      appendln(baseErrorMsg).appendln()
+      appendln("Candidates were: (with input = ${input?.javaClass?.name ?: "null"}):").append("    ")
+      candidates.joinTo(this, "\n    ") { candidates.toString() }
+    }
   }
 
   private fun isSecondParameterCompatible(input: Any?, method: Method): Boolean {
@@ -174,27 +217,6 @@ open class GenerateTask: DefaultTask() {
     } else {
       return method.parameterTypes[1].isInstance(input)
     }
-  }
-
-  private fun Class<*>.getGenerateDirMethod(input: Any?):Method {
-    return methods.asSequence()
-        .filter { it.name=="doGenerate" }
-        .filter { Modifier.isPublic(it.modifiers) }
-        .filter { if (input==null) it.parameterCount in 1..2 else it.parameterCount==2 }
-        .let {
-          val candidates = it.toList()
-          candidates.asSequence().filter { (File::class.java==it.parameterTypes[0].apply { project.logger.debug("Rejecting $it as the first parameter is not a file") }) }
-              .filter { if (it.parameterCount==1) true else  isSecondParameterCompatible(input, it) }
-              .singleOrNull() ?: throw NoSuchMethodError("""
-              Generators must have a unique public method "doGenerate(File, [Object])"
-              where the second parameter is optional iff the input is null. If not a static
-              method, the class must have a noArg constructor.
-
-              Candidates were (with input = ${input?.javaClass?.name?:"null"}):
-                  ${candidates.joinToString("\n    ") { it.toString() }}
-              """.trimIndent() )
-
-        }
   }
 
   private fun combinedClasspath(others: FileCollection?): Array<out URL>? {
@@ -207,6 +229,25 @@ open class GenerateTask: DefaultTask() {
     }.toTypedArray().apply { project.logger.debug("Classpath for generator: ${Arrays.toString(this)}") }
   }
 
+}
+
+fun Method.doInvoke(receiver:Class<out Any>, firstParam: Any, input: Any?) {
+  val generatorInst = if (Modifier.isStatic(modifiers)) null else receiver.newInstance()
+
+  val body = { output:Any ->
+    if (this.parameterCount == 1) {
+      invoke(generatorInst, output)
+    } else {
+      invoke(generatorInst, output, input)
+    }
+  }
+
+  if (firstParam is File) {
+    body(firstParam)
+  } else {
+    @Suppress("UNCHECKED_CAST")
+    (((firstParam as ()->Any).invoke()) as Writer).use(body)
+  }
 }
 
 public const val INPUT_SOURCE_SET = "generatorSources"

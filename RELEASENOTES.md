@@ -1,5 +1,11 @@
 ### 0.5.8:
-* Fix diagnostics
+* Much better diagnostics and error handling
+* Instead of requiring the input to be realized immediately, it can be a
+  Callable instead, that will be resolved if there is no doGenerate method
+  that takes Callables. The result of the callable is used to resolve the
+  actually invoked doGenerate method.
+* Allow for absolute paths, by making sure not to resolve them against
+  the base directory when they are absolute.
 
 ### 0.5.7: 
 * Resolve most things lazilly. In particularly only set the "files" for the generate
