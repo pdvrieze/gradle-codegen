@@ -24,19 +24,14 @@ import groovy.lang.Closure
 import org.gradle.api.*
 import org.gradle.api.file.FileCollection
 import org.gradle.api.internal.HasConvention
-import org.gradle.api.internal.tasks.DefaultSourceSetOutput
-import org.gradle.api.internal.tasks.TaskDependencyInternal
-import org.gradle.api.internal.tasks.TaskDependencyResolveContext
 import org.gradle.api.plugins.BasePlugin
 import org.gradle.api.plugins.JavaBasePlugin
-import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginConvention
 import org.gradle.api.tasks.*
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.gradle.util.ConfigureUtil
 import org.jetbrains.annotations.NotNull
 import java.io.File
-import java.io.StringWriter
 import java.io.Writer
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
@@ -44,7 +39,6 @@ import java.net.URL
 import java.net.URLClassLoader
 import java.util.*
 import java.util.concurrent.Callable
-import kotlin.reflect.KClass
 
 val Project.sourceSets: SourceSetContainer
   get() = project.convention.getPlugin(JavaPluginConvention::class.java).sourceSets
@@ -65,6 +59,8 @@ open class GenerateTask: DefaultTask() {
 
   val dirGenerator = GenerateDirSpec()
 
+  @Suppress("unused")
+      /** Configuration function that allows the dirGenerator to be configured with a closure. */
   fun dirGenerator(closure: Closure<Any?>?) {
     ConfigureUtil.configure(closure, dirGenerator)
   }
@@ -72,8 +68,11 @@ open class GenerateTask: DefaultTask() {
   @Input
   internal var container: NamedDomainObjectContainer<GenerateSpec>? = null
 
+  /**
+   * This performs the actual action of the task.
+   */
   @TaskAction
-  private fun generate() {
+  fun generate() {
     URLClassLoader(combinedClasspath(null)). use { joinedLoader ->
       container?.all { spec: GenerateSpec ->
         val specClasspath = spec.classpath
@@ -87,7 +86,7 @@ open class GenerateTask: DefaultTask() {
       }
 
       if (dirGenerator.generator!=null) {
-        val outDir = if (dirGenerator.outputDir ==null) project.file(outputDir) else resolveFile(project.file(outputDir),dirGenerator.outputDir!!)
+        val outDir = if (dirGenerator.outputDir ==null) project.file(outputDir) else resolveFile(dirGenerator.outputDir!!)
         if (dirGenerator.classpath!=null) {
           URLClassLoader(combinedClasspath(dirGenerator.classpath)). use {
             generateDir(outDir, it)
@@ -116,7 +115,7 @@ open class GenerateTask: DefaultTask() {
     generatorClass.execute(outDir, dirGenerator.input, baseError)
   }
 
-  private fun resolveFile(context:File, fileName:String):File {
+  private fun resolveFile(fileName: String):File {
     return File(fileName).let {
       if (it.isAbsolute) it
       else File(project.file(outputDir), fileName)
@@ -125,7 +124,7 @@ open class GenerateTask: DefaultTask() {
 
   private fun generateFile(spec: GenerateSpec, classLoader: ClassLoader) {
     if (spec.output != null) {
-      val outFile = resolveFile(project.file(outputDir), spec.output!!)
+      val outFile = resolveFile(spec.output!!)
 
       if (spec.generator != null) {
         val gname = spec.generator
@@ -138,7 +137,7 @@ open class GenerateTask: DefaultTask() {
         if (!outFile.canWrite()) throw InvalidUserDataException("The output file ($outFile) is not writeable.")
 
         if (project.logger.isInfoEnabled) {
-          project.logger.info("Generating ${spec.name} as '${spec.output}' as '${outFile}'")
+          project.logger.info("Generating ${spec.name} as '${spec.output}' as '$outFile'")
         } else {
           project.logger.lifecycle("Generating ${spec.name} as '${spec.output}'")
         }
@@ -160,7 +159,7 @@ open class GenerateTask: DefaultTask() {
     return methods.asSequence()
         .filter { it.name=="doGenerate" }
         .filter { Modifier.isPublic(it.modifiers) }
-        .filter { if (input==null) it.parameterCount in 1..2 else it.parameterCount==2 }
+        .filter { if (input==null) it.parameterCountCompat in 1..2 else it.parameterCountCompat ==2 }
         .filter {
           if(firstParamWriter) {
             Appendable::class.java.isAssignableFrom(it.parameterTypes[0]) && it.parameterTypes[0].isAssignableFrom(Writer::class.java)
@@ -176,7 +175,7 @@ open class GenerateTask: DefaultTask() {
         var resolvedInput = input
         var methodIterator = candidates
             .asSequence()
-            .filter { if (it.parameterCount == 1) true else isSecondParameterCompatible(input, it) }
+            .filter { if (it.parameterCountCompat == 1) true else isSecondParameterCompatible(input, it) }
             .iterator()
 
         if (input is Callable<*> && !methodIterator.hasNext()) {
@@ -231,11 +230,13 @@ open class GenerateTask: DefaultTask() {
 
 }
 
+internal val Method.parameterCountCompat:Int get() = parameterTypes.size
+
 fun Method.doInvoke(receiver:Class<out Any>, firstParam: Any, input: Any?) {
   val generatorInst = if (Modifier.isStatic(modifiers)) null else receiver.newInstance()
 
   val body = { output:Any ->
-    if (this.parameterCount == 1) {
+    if (this.parameterCountCompat == 1) {
       invoke(generatorInst, output)
     } else {
       invoke(generatorInst, output, input)
@@ -250,13 +251,7 @@ fun Method.doInvoke(receiver:Class<out Any>, firstParam: Any, input: Any?) {
   }
 }
 
-public const val INPUT_SOURCE_SET = "generatorSources"
-public const val OUTPUT_SOURCE_SET = "generatedSources"
-public const val DEFAULT_GEN_DIR = "gen"
-
-interface GenerateImpl {
-  fun doGenerate(output: Writer, input: Iterable<File>?)
-}
+const val DEFAULT_GEN_DIR = "gen"
 
 class GenerateSpec(val name: String) {
   var output: String?=null
@@ -274,6 +269,7 @@ class GenerateDirSpec() {
 
 open class GenerateSourceSet(val generate: NamedDomainObjectContainer<GenerateSpec>) {
 
+  @Suppress("unused")
   fun generate(configureClosure: Closure<Any?>?): GenerateSourceSet {
     ConfigureUtil.configure(configureClosure, generate)
     return this
@@ -285,14 +281,14 @@ class CodegenPlugin : Plugin<Project> {
   override fun apply(project: Project) {
     project.plugins.apply(JavaBasePlugin::class.java)
 
-    val sourceSetsToSkip = mutableSetOf<String>("generators")
+    val sourceSetsToSkip = mutableSetOf("generators")
     project.sourceSets.all {sourceSet ->
       if (! sourceSetsToSkip.contains(sourceSet.name)) {
         if (sourceSet.name.endsWith("enerators")) {
-          project.logger.error("Generators sourceSet (${sourceSet.name}) not registered in ${sourceSetsToSkip}")
+          project.logger.error("Generators sourceSet (${sourceSet.name}) not registered in $sourceSetsToSkip")
         }else {
           processSourceSet(project, sourceSet, sourceSetsToSkip)
-          project.logger.debug("sourceSetsToSkip is now: ${sourceSetsToSkip}")
+          project.logger.debug("sourceSetsToSkip is now: $sourceSetsToSkip")
         }
       }
 

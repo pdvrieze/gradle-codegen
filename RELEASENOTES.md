@@ -1,3 +1,6 @@
+### 0.5.9:
+* Fix compatibility with jdk 7. Fix warnings.
+
 ### 0.5.8:
 * Much better diagnostics and error handling
 * Instead of requiring the input to be realized immediately, it can be a
