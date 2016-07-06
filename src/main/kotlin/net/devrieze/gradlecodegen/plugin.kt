@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2016.
  *
- * This file is part of kotlinsql.
+ * This file is part of gradle-codegen.
  *
  * This file is licenced to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
