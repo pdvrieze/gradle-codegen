@@ -302,7 +302,6 @@ class CodegenPlugin : Plugin<Project> {
 
   private fun processSourceSet(project: Project, sourceSet: SourceSet, doSkip:MutableSet<String>) {
     val generateTaskName = if (sourceSet.name == "main") "generate" else sourceSet.getTaskName("generate", null)
-    val cleanTaskName = if (sourceSet.name == "main") "${BasePlugin.CLEAN_TASK_NAME}Generate" else sourceSet.getTaskName(BasePlugin.CLEAN_TASK_NAME, "generate")
 
     val generateConfiguration = project.configurations.maybeCreate(generateTaskName)
     project.configurations.add(generateConfiguration)
@@ -331,19 +330,16 @@ class CodegenPlugin : Plugin<Project> {
     // Late bind the actual output directory
     sourceSet.java.srcDir(Callable { generateTask.outputDir })
 
-
-    val cleanTask = project.tasks.create(cleanTaskName) { clean ->
-      clean.description = "Clean the generated source folder"
-      clean.group = BasePlugin.BUILD_GROUP
-      clean.doFirst { project.delete(outputDir) }
-    }
-
     project.configurations.getByName(sourceSet.compileConfigurationName).extendsFrom(generateConfiguration)
 
     project.afterEvaluate {
       project.extensions.getByType(IdeaModel::class.java)?.let { ideaModel ->
         ideaModel.module.generatedSourceDirs.add(project.file(generateTask.outputDir))
       }
+      (project.tasks.getByName("clean") as? Delete)?.let { cleanTask ->
+        cleanTask.delete(outputDir)
+      }
+
     }
   }
 
