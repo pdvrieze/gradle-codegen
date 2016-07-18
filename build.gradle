@@ -23,7 +23,7 @@ buildscript {
 
     ext {
         if (!rootProject.ext.has('kotlin_version')) {
-            kotlin_version = '1.0.1-2'
+            kotlin_version = '1.0.3'
         }
     }
     dependencies {
@@ -52,7 +52,7 @@ apply plugin: 'kotlin'
 sourceCompatibility = JavaVersion.VERSION_1_6
 targetCompatibility = JavaVersion.VERSION_1_6
 
-version = '0.5.9'
+version = '0.5.10'
 group = 'net.devrieze'
 
 bintray {

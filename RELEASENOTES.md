@@ -1,3 +1,7 @@
+### 0.5.10
+* Add the generated files to the standard clean task instead of using custom clean tasks.
+* Some optimizations for configuration.
+
 ### 0.5.9:
 * Fix compatibility with jdk 7. Fix warnings.
 

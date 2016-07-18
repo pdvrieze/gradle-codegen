@@ -24,7 +24,6 @@ import groovy.lang.Closure
 import org.gradle.api.*
 import org.gradle.api.file.FileCollection
 import org.gradle.api.internal.HasConvention
-import org.gradle.api.plugins.BasePlugin
 import org.gradle.api.plugins.JavaBasePlugin
 import org.gradle.api.plugins.JavaPluginConvention
 import org.gradle.api.tasks.*
@@ -43,17 +42,17 @@ import java.util.concurrent.Callable
 val Project.sourceSets: SourceSetContainer
   get() = project.convention.getPlugin(JavaPluginConvention::class.java).sourceSets
 
-operator fun SourceSetContainer.get(name:String): SourceSet = getByName(name)
+operator fun SourceSetContainer.get(name: String): SourceSet = getByName(name)
 
-open class GenerateTask: DefaultTask() {
+open class GenerateTask : DefaultTask() {
 
   init {
     group = "generate"
-    outputs.upToDateWhen { task-> false } // do something smarter
+    outputs.upToDateWhen { task -> false } // do something smarter
   }
 
   @OutputDirectory
-  var outputDir:Any = project.file(DEFAULT_GEN_DIR)
+  var outputDir: Any = project.file(DEFAULT_GEN_DIR)
 
   var classpath: FileCollection? = null
 
@@ -65,6 +64,8 @@ open class GenerateTask: DefaultTask() {
     ConfigureUtil.configure(closure, dirGenerator)
   }
 
+  fun classpath(params:Any) { classpath = project.files(params) }
+
   @Input
   internal var container: NamedDomainObjectContainer<GenerateSpec>? = null
 
@@ -73,10 +74,10 @@ open class GenerateTask: DefaultTask() {
    */
   @TaskAction
   fun generate() {
-    URLClassLoader(combinedClasspath(null)). use { joinedLoader ->
+    URLClassLoader(combinedClasspath(null)).use { joinedLoader ->
       container?.all { spec: GenerateSpec ->
         val specClasspath = spec.classpath
-        if (specClasspath ==null || specClasspath.isEmpty) {
+        if (specClasspath == null || specClasspath.isEmpty) {
           generateFile(spec, joinedLoader)
         } else {
           URLClassLoader(combinedClasspath(spec.classpath)).use { classLoader ->
@@ -85,10 +86,10 @@ open class GenerateTask: DefaultTask() {
         }
       }
 
-      if (dirGenerator.generator!=null) {
-        val outDir = if (dirGenerator.outputDir ==null) project.file(outputDir) else resolveFile(dirGenerator.outputDir!!)
-        if (dirGenerator.classpath!=null) {
-          URLClassLoader(combinedClasspath(dirGenerator.classpath)). use {
+      if (dirGenerator.generator != null) {
+        val outDir = if (dirGenerator.outputDir == null) project.file(outputDir) else resolveFile(dirGenerator.outputDir!!)
+        if (dirGenerator.classpath != null) {
+          URLClassLoader(combinedClasspath(dirGenerator.classpath)).use {
             generateDir(outDir, it)
           }
         } else {
@@ -100,7 +101,7 @@ open class GenerateTask: DefaultTask() {
   }
 
   private fun generateDir(outDir: File, classLoader: ClassLoader) {
-    if (! outDir.exists()) {
+    if (!outDir.exists()) {
       if (!outDir.mkdirs()) throw InvalidUserDataException("The output directory $outDir could not be created")
     } // ensure the output directory exists
     if (!outDir.canWrite()) throw InvalidUserDataException("The output directory $outDir is not writeable")
@@ -115,7 +116,7 @@ open class GenerateTask: DefaultTask() {
     generatorClass.execute(outDir, dirGenerator.input, baseError)
   }
 
-  private fun resolveFile(fileName: String):File {
+  private fun resolveFile(fileName: String): File {
     return File(fileName).let {
       if (it.isAbsolute) it
       else File(project.file(outputDir), fileName)
@@ -131,7 +132,7 @@ open class GenerateTask: DefaultTask() {
         val generatorClass = classLoader.loadClass(gname)
         if (outFile.isDirectory) throw InvalidUserDataException("The output can not be a directory, it must be a file ($outFile)")
         if (!outFile.exists()) {
-          outFile.parentFile.apply { if (! exists()) mkdirs() || throw InvalidUserDataException("The target directory for the output file $outFile could not be created")}
+          outFile.parentFile.apply { if (!exists()) mkdirs() || throw InvalidUserDataException("The target directory for the output file $outFile could not be created") }
           outFile.createNewFile()
         }
         if (!outFile.canWrite()) throw InvalidUserDataException("The output file ($outFile) is not writeable.")
@@ -147,7 +148,7 @@ open class GenerateTask: DefaultTask() {
               where the second parameter is optional iff the input is null. If not a static
               method, the class must have a noArg constructor.""".trimIndent()
 
-        generatorClass.execute({outFile.writer()}, spec.input, baseError)
+        generatorClass.execute({ outFile.writer() }, spec.input, baseError)
 
       } else {
         throw InvalidUserDataException("Missing output code for generateSpec ${spec.name}, no generator provided")
@@ -155,21 +156,21 @@ open class GenerateTask: DefaultTask() {
     }
   }
 
-  private fun Class<*>.getGeneratorMethods(firstParamWriter: Boolean, input:Any?):List<Method> {
+  private fun Class<*>.getGeneratorMethods(firstParamWriter: Boolean, input: Any?): List<Method> {
     return methods.asSequence()
-        .filter { it.name=="doGenerate" }
+        .filter { it.name == "doGenerate" }
         .filter { Modifier.isPublic(it.modifiers) }
-        .filter { if (input==null) it.parameterCountCompat in 1..2 else it.parameterCountCompat ==2 }
+        .filter { if (input == null) it.parameterCountCompat in 1..2 else it.parameterCountCompat == 2 }
         .filter {
-          if(firstParamWriter) {
+          if (firstParamWriter) {
             Appendable::class.java.isAssignableFrom(it.parameterTypes[0]) && it.parameterTypes[0].isAssignableFrom(Writer::class.java)
           } else {
-            File::class.java==it.parameterTypes[0]
+            File::class.java == it.parameterTypes[0]
           }
         }.toList()
   }
 
-  private fun Class<out Any>.execute(firstParam: Any, input:Any?, baseErrorMsg:String) {
+  private fun Class<out Any>.execute(firstParam: Any, input: Any?, baseErrorMsg: String) {
     getGeneratorMethods(firstParam !is File, input).let { candidates ->
       try {
         var resolvedInput = input
@@ -184,24 +185,26 @@ open class GenerateTask: DefaultTask() {
               .filter { isSecondParameterCompatible(resolvedInput, it) }.iterator()
         }
 
-        if (! methodIterator.hasNext()) throw InvalidUserDataException(errorMsg("No candidate method found", candidates, baseErrorMsg, input))
+        if (!methodIterator.hasNext()) throw InvalidUserDataException(errorMsg("No candidate method found", candidates, baseErrorMsg, input))
 
         val m = methodIterator.next()
 
-        if (methodIterator.hasNext()) { throw InvalidUserCodeException(ambiguousChoice(candidates, baseErrorMsg, input)) }
+        if (methodIterator.hasNext()) {
+          throw InvalidUserCodeException(ambiguousChoice(candidates, baseErrorMsg, input))
+        }
         m.doInvoke(this, firstParam, resolvedInput)
         return
-      } catch (e:Exception) {
+      } catch (e: Exception) {
         throw InvalidUserDataException("Could not execute the generator code", e)
       }
     }
   }
 
-  private fun ambiguousChoice(candidates: Iterable<Method>, baseErrorMsg: String, input:Any?): String {
+  private fun ambiguousChoice(candidates: Iterable<Method>, baseErrorMsg: String, input: Any?): String {
     return errorMsg("More than 1 valid candidate found.", candidates, baseErrorMsg, input)
   }
 
-  private fun errorMsg(error:String, candidates: Iterable<Method>, baseErrorMsg: String, input:Any?): String {
+  private fun errorMsg(error: String, candidates: Iterable<Method>, baseErrorMsg: String, input: Any?): String {
     return buildString {
       appendln(error)
       appendln(baseErrorMsg).appendln()
@@ -211,7 +214,7 @@ open class GenerateTask: DefaultTask() {
   }
 
   private fun isSecondParameterCompatible(input: Any?, method: Method): Boolean {
-    if (input==null) {
+    if (input == null) {
       return (method.parameterAnnotations[1].none { annotation -> annotation is NotNull })
     } else {
       return method.parameterTypes[1].isInstance(input)
@@ -220,22 +223,22 @@ open class GenerateTask: DefaultTask() {
 
   private fun combinedClasspath(others: FileCollection?): Array<out URL>? {
 
-    fun Iterable<File>.toUrls():Sequence<URL> = asSequence().map { it.toURI().toURL() }
+    fun Iterable<File>.toUrls(): Sequence<URL> = asSequence().map { it.toURI().toURL() }
 
     return mutableListOf<URL>().apply {
-      classpath?.let{ it.toUrls().forEach{ add(it) } }
-      others?.let{ it.toUrls().forEach{ add(it) } }
+      classpath?.let { it.toUrls().forEach { add(it) } }
+      others?.let { it.toUrls().forEach { add(it) } }
     }.toTypedArray().apply { project.logger.debug("Classpath for generator: ${Arrays.toString(this)}") }
   }
 
 }
 
-internal val Method.parameterCountCompat:Int get() = parameterTypes.size
+internal val Method.parameterCountCompat: Int get() = parameterTypes.size
 
-fun Method.doInvoke(receiver:Class<out Any>, firstParam: Any, input: Any?) {
+fun Method.doInvoke(receiver: Class<out Any>, firstParam: Any, input: Any?) {
   val generatorInst = if (Modifier.isStatic(modifiers)) null else receiver.newInstance()
 
-  val body = { output:Any ->
+  val body = { output: Any ->
     if (this.parameterCountCompat == 1) {
       invoke(generatorInst, output)
     } else {
@@ -247,24 +250,24 @@ fun Method.doInvoke(receiver:Class<out Any>, firstParam: Any, input: Any?) {
     body(firstParam)
   } else {
     @Suppress("UNCHECKED_CAST")
-    (((firstParam as ()->Any).invoke()) as Writer).use(body)
+    (((firstParam as () -> Any).invoke()) as Writer).use(body)
   }
 }
 
 const val DEFAULT_GEN_DIR = "gen"
 
 class GenerateSpec(val name: String) {
-  var output: String?=null
-  var generator: String?=null
+  var output: String? = null
+  var generator: String? = null
   var classpath: FileCollection? = null
-  var input: Any?=null
+  var input: Any? = null
 }
 
 class GenerateDirSpec() {
-  var input: Any?=null
-  var generator: String?=null
+  var input: Any? = null
+  var generator: String? = null
   var classpath: FileCollection? = null
-  var outputDir: String?=null
+  var outputDir: String? = null
 }
 
 open class GenerateSourceSet(val generate: NamedDomainObjectContainer<GenerateSpec>) {
@@ -282,11 +285,11 @@ class CodegenPlugin : Plugin<Project> {
     project.plugins.apply(JavaBasePlugin::class.java)
 
     val sourceSetsToSkip = mutableSetOf("generators")
-    project.sourceSets.all {sourceSet ->
-      if (! sourceSetsToSkip.contains(sourceSet.name)) {
+    project.sourceSets.all { sourceSet ->
+      if (!sourceSetsToSkip.contains(sourceSet.name)) {
         if (sourceSet.name.endsWith("enerators")) {
           project.logger.error("Generators sourceSet (${sourceSet.name}) not registered in $sourceSetsToSkip")
-        }else {
+        } else {
           processSourceSet(project, sourceSet, sourceSetsToSkip)
           project.logger.debug("sourceSetsToSkip is now: $sourceSetsToSkip")
         }
@@ -295,12 +298,10 @@ class CodegenPlugin : Plugin<Project> {
     }
 
 
-
-
 //    project.logger.lifecycle("Welcome to the kotlinsql builder plugin")
   }
 
-  private fun processSourceSet(project: Project, sourceSet: SourceSet, doSkip:MutableSet<String>) {
+  private fun processSourceSet(project: Project, sourceSet: SourceSet, doSkip: MutableSet<String>) {
     val generateTaskName = if (sourceSet.name == "main") "generate" else sourceSet.getTaskName("generate", null)
 
     val generateConfiguration = project.configurations.maybeCreate(generateTaskName)
@@ -318,12 +319,11 @@ class CodegenPlugin : Plugin<Project> {
     val generateTask = project.tasks.create(generateTaskName, GenerateTask::class.java).apply {
       dependsOn(Callable { generateConfiguration })
       dependsOn(Callable { generatorSourceSet.classesTaskName })
-      classpath = project.files(Callable {generateConfiguration} , Callable { generatorSourceSet.runtimeClasspath } )
+      classpath = project.files(Callable { generateConfiguration }, Callable { generatorSourceSet.runtimeClasspath })
       this.outputDir = outputDir
       container = generateExt
     }
 
-    project.afterEvaluate { generateConfiguration.files (closure { generateTask.outputDir }) }
 
     project.dependencies.add(sourceSet.compileConfigurationName, project.files(Callable { generateConfiguration.files }).apply { builtBy(generateTask) })
 
@@ -333,9 +333,12 @@ class CodegenPlugin : Plugin<Project> {
     project.configurations.getByName(sourceSet.compileConfigurationName).extendsFrom(generateConfiguration)
 
     project.afterEvaluate {
+      generateConfiguration.files(closure { generateTask.outputDir })
+
       project.extensions.getByType(IdeaModel::class.java)?.let { ideaModel ->
         ideaModel.module.generatedSourceDirs.add(project.file(generateTask.outputDir))
       }
+
       (project.tasks.getByName("clean") as? Delete)?.let { cleanTask ->
         cleanTask.delete(outputDir)
       }
@@ -355,7 +358,7 @@ class CodegenPlugin : Plugin<Project> {
 
 }
 
-private fun<T> closure(block:(args:Array<out Any?>)->T): Closure<T> = object:Closure<T>(Unit) {
+private fun <T> closure(block: (args: Array<out Any?>) -> T): Closure<T> = object : Closure<T>(Unit) {
 
   override fun call(vararg args: Any?): T {
     return block(args)
