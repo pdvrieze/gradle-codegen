@@ -1,6 +1,7 @@
 ### 0.5.10
 * Add the generated files to the standard clean task instead of using custom clean tasks.
 * Some optimizations for configuration.
+* Use Kotlin 1.1 to compile (but at source level 1.0)
 
 ### 0.5.9:
 * Fix compatibility with jdk 7. Fix warnings.

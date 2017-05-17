@@ -23,7 +23,7 @@ buildscript {
 
     ext {
         if (!rootProject.ext.has('kotlin_version')) {
-            kotlin_version = '1.0.3'
+            kotlin_version = '1.1.2-3'
         }
     }
     dependencies {
@@ -74,6 +74,13 @@ bintray {
             vcsTag = "v$version"
             attributes = [ 'gradle-plugin': 'net.devrieze:gradle-codegen:net.devrieze.gradlecodegen' ]
         }
+    }
+}
+
+compileKotlin {
+    kotlinOptions {
+        apiVersion = '1.0'
+        languageVersion = '1.0'
     }
 }
 
