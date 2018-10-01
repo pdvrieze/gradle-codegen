@@ -56,8 +56,8 @@ version = '0.5.10'
 group = 'net.devrieze'
 
 bintray {
-    user = bintrayUser
-    key = bintrayApiKey
+    user = project.findProperty('bintrayUser') ?: ''
+    key = project.findProperty('bintrayApiKey') ?: ''
     publications = ['MyPublication']
 
     pkg {
