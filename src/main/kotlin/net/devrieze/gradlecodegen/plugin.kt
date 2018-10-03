@@ -335,7 +335,7 @@ class CodegenPlugin : Plugin<Project> {
     project.afterEvaluate {
       generateConfiguration.files(closure { generateTask.outputDir })
 
-      project.extensions.getByType(IdeaModel::class.java)?.let { ideaModel ->
+      project.extensions.findByType(IdeaModel::class.java)?.let { ideaModel ->
         ideaModel.module.generatedSourceDirs.add(project.file(generateTask.outputDir))
       }
 
