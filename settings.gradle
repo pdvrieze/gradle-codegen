@@ -1,0 +1,40 @@
+pluginManagement {
+    repositories {
+        mavenLocal()
+        gradlePluginPortal()
+        mavenCentral()
+    }
+    resolutionStrategy {
+        eachPlugin {
+            switch (requested.id.id) {
+                case "net.devrieze.gradlecodegen":
+                    def ver = requested.version!=null ? requested.version : codegen_version
+                    useVersion(ver)
+                    break;
+                case "org.jetbrains.kotlin.android":
+                case "org.jetbrains.kotlin.jvm":
+                case "kotlin-android-extensions" :
+                case "org.jetbrains.kotlin.multiplatform":
+                    def ver = requested.version!=null ? requested.version : kotlin_version
+                    useVersion(ver)
+                    break
+                case "org.jetbrains.dokka" :
+                case "org.jetbrains.dokka-android" :
+                    def ver = requested.version!=null ? requested.version : dokkaVersion
+                    useVersion(ver)
+                    break
+                case "org.jetbrains.kotlinx.binary-compatibility-validator" :
+                    def ver = requested.version!=null ? requested.version : validatorVersion
+                    useModule("org.jetbrains.kotlinx:binary-compatibility-validator:$ver")
+                    break
+                case "kotlinx-serialization":
+                    def version = (requested.version == null || requested.version.length() == 0) ? kotlin_version : requested.version
+                    useModule("org.jetbrains.kotlin:kotlin-serialization:$version")
+                    break
+            }
+        }
+    }
+
+}
+
+rootProject.name="gradle-codegen"
