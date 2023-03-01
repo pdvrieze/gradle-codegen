@@ -23,22 +23,26 @@ plugins {
     `java-gradle-plugin`
     kotlin("jvm") version embeddedKotlinVersion
     `maven-publish`
-    id("com.gradle.plugin-publish") version "0.14.0"
+    id("com.gradle.plugin-publish") version "1.1.0"
 }
 
-version = "0.5.12"
+version = "0.6.0"
 group = "net.devrieze"
 
 base {
     archivesName.set("gradlecodegen")
 }
 
+java {
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
 kotlin {
     target {
         compilations.all {
             kotlinOptions {
-                apiVersion = "1.5"
-                languageVersion = "1.5"
+                apiVersion = "1.8"
+                languageVersion = "1.8"
                 jvmTarget = "1.8"
             }
         }
