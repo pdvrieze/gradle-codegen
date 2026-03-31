@@ -1,3 +1,8 @@
+@file:Suppress("OPT_IN_USAGE")
+
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+
 /*
  * Copyright (c) 2016.
  *
@@ -20,13 +25,13 @@
 
 
 plugins {
-    `java-gradle-plugin`
     kotlin("jvm") version embeddedKotlinVersion
-    `maven-publish`
-    id("com.gradle.plugin-publish") version "1.1.0"
+//    `java-gradle-plugin`
+//    `maven-publish`
+    id("com.gradle.plugin-publish") version "2.0.0"
 }
 
-version = "0.6.0"
+version = "0.7.0"
 group = "net.devrieze"
 
 base {
@@ -34,17 +39,15 @@ base {
 }
 
 java {
-    targetCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 kotlin {
     target {
-        compilations.all {
-            kotlinOptions {
-                apiVersion = "1.8"
-                languageVersion = "1.8"
-                jvmTarget = "1.8"
-            }
+        compilerOptions {
+            apiVersion = KotlinVersion.KOTLIN_1_8
+            languageVersion = KotlinVersion.KOTLIN_1_8
+            jvmTarget = JvmTarget.fromTarget(java.targetCompatibility.toString())
         }
     }
 }
@@ -55,19 +58,16 @@ publishing {
     }
 }
 
-pluginBundle {
+gradlePlugin {
     website = "https://github.com/pdvrieze/gradle-codegen.git"
     vcsUrl = "https://github.com/pdvrieze/gradle-codegen.git"
-    tags = listOf("generate", "codegen", "code-generation")
-}
-
-gradlePlugin {
     plugins {
         register("gradlecodegen") {
             id = "net.devrieze.gradlecodegen"
             displayName = "Code generation plugin for gradle"
             description =
                 "A plugin to aid with codeGeneration without using buildSrc. It provides an additional generate section to sourceSets. In this section individual files to be generated can be specified. Each sourceset has an accompanying ...generator sourceSet where the actual generator source can live. See https://github.com/pdvrieze/gradle-codegen for documentation"
+            tags = listOf("generate", "codegen", "code-generation")
             implementationClass = "net.devrieze.gradlecodegen.CodegenPlugin"
         }
     }
