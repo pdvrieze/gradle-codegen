@@ -56,9 +56,9 @@ open class GenerateTask : DefaultTask() {
     @get:Input
     val dirGenerator = GenerateDirSpec()
 
+    /** Configuration function that allows the dirGenerator to be configured with a closure. */
     @Suppress("unused")
-            /** Configuration function that allows the dirGenerator to be configured with a closure. */
-    fun dirGenerator(closure: Closure<Any?>?) {
+    fun dirGenerator(closure: Closure<Any>) {
         project.configure(dirGenerator, closure)
     }
 
@@ -75,13 +75,14 @@ open class GenerateTask : DefaultTask() {
     @TaskAction
     fun generate() {
         URLClassLoader(combinedClasspath(null)).use { joinedLoader ->
-            container.all { spec: GenerateSpec ->
-                val specClasspath = spec.classpath
-                if (specClasspath == null || specClasspath.isEmpty) {
-                    generateFile(spec, joinedLoader)
+            container.configureEach {
+                val specClasspath = classpath.get()
+
+                if (specClasspath.isEmpty) {
+                    generateFile(this, joinedLoader)
                 } else {
-                    URLClassLoader(combinedClasspath(spec.classpath)).use { classLoader ->
-                        generateFile(spec, classLoader)
+                    URLClassLoader(combinedClasspath(specClasspath)).use { classLoader ->
+                        generateFile(this, classLoader)
                     }
                 }
             }
@@ -125,11 +126,14 @@ open class GenerateTask : DefaultTask() {
     }
 
     private fun generateFile(spec: GenerateSpec, classLoader: ClassLoader) {
-        if (spec.output != null) {
-            val outFile = resolveFile(spec.output!!)
+        val outputProp = spec.output
+        val generatorProp = spec.generator
+        if (outputProp.isPresent) {
+        val specOutput = outputProp.get()
+            val outFile = resolveFile(specOutput)
 
-            if (spec.generator != null) {
-                val gname = spec.generator
+            if (generatorProp.isPresent) {
+                val gname = generatorProp.get()
                 val generatorClass = classLoader.loadClass(gname)
                 if (outFile.isDirectory) throw InvalidUserDataException("The output can not be a directory, it must be a file ($outFile)")
                 if (!outFile.exists()) {
@@ -139,9 +143,9 @@ open class GenerateTask : DefaultTask() {
                 if (!outFile.canWrite()) throw InvalidUserDataException("The output file ($outFile) is not writeable.")
 
                 if (project.logger.isInfoEnabled) {
-                    project.logger.info("Generating ${spec.name} as '${spec.output}' as '$outFile'")
+                    project.logger.info("Generating ${spec._name} as '$specOutput' as '$outFile'")
                 } else {
-                    project.logger.lifecycle("Generating ${spec.name} as '${spec.output}'")
+                    project.logger.lifecycle("Generating ${spec._name} as '$specOutput'")
                 }
 
                 val baseError = """
@@ -152,7 +156,7 @@ open class GenerateTask : DefaultTask() {
                 generatorClass.execute({ outFile.writer() }, spec.input, baseError)
 
             } else {
-                throw InvalidUserDataException("Missing output code for generateSpec ${spec.name}, no generator provided")
+                throw InvalidUserDataException("Missing output code for generateSpec ${spec._name}, no generator provided")
             }
         }
     }

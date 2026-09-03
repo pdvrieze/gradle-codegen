@@ -1,8 +1,3 @@
-@file:Suppress("OPT_IN_USAGE")
-
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
-
 /*
  * Copyright (c) 2016.
  *
@@ -23,15 +18,20 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
  * under the License.
  */
 
+@file:Suppress("OPT_IN_USAGE")
+
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
+    `kotlin-dsl`
+    `java-gradle-plugin`
     kotlin("jvm") version embeddedKotlinVersion
-//    `java-gradle-plugin`
-//    `maven-publish`
-    id("com.gradle.plugin-publish") version "2.0.0"
+
+    id("com.gradle.plugin-publish") version "2.1.1"
 }
 
-version = "0.7.0"
+version = "0.7.1"
 group = "net.devrieze"
 
 base {
@@ -45,8 +45,8 @@ java {
 kotlin {
     target {
         compilerOptions {
-            apiVersion = KotlinVersion.KOTLIN_1_8
-            languageVersion = KotlinVersion.KOTLIN_1_8
+            apiVersion = KotlinVersion.KOTLIN_2_2
+            languageVersion = KotlinVersion.KOTLIN_2_2
             jvmTarget = JvmTarget.fromTarget(java.targetCompatibility.toString())
         }
     }

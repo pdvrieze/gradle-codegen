@@ -24,17 +24,19 @@ import groovy.lang.Closure
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.internal.HasConvention
 import org.gradle.api.plugins.JavaBasePlugin
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.kotlin.dsl.domainObjectContainer
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import java.io.File
 import java.io.Writer
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
+import java.util.Locale
+import java.util.Locale.getDefault
 import java.util.concurrent.Callable
 
 val Project.sourceSets: SourceSetContainer
@@ -71,13 +73,13 @@ class CodegenPlugin : Plugin<Project> {
         project.plugins.apply(JavaBasePlugin::class.java)
 
         val sourceSetsToSkip = mutableSetOf("generators")
-        project.sourceSets.all { sourceSet ->
-            if (!sourceSetsToSkip.contains(sourceSet.name)) {
-                if (sourceSet.name.toLowerCase().endsWith("generators")) {
+        project.sourceSets.configureEach { val sourceSet = this
+            if (sourceSet.name !in sourceSetsToSkip) {
+                if (sourceSet.name.lowercase().endsWith("generators")) {
                     project.logger.error("Generators sourceSet (${sourceSet.name}) not registered in $sourceSetsToSkip")
                 } else {
                     processSourceSet(project, sourceSet, sourceSetsToSkip)
-                    project.logger.debug("sourceSetsToSkip is now: $sourceSetsToSkip")
+                    project.logger.debug("sourceSetsToSkip is now: {}", sourceSetsToSkip)
                 }
             }
 
@@ -98,14 +100,14 @@ class CodegenPlugin : Plugin<Project> {
 
         val generatorSourceSet = project.sourceSets.maybeCreate(generatorSourceSetName)
 
-        val generateExt = createConfigurationExtension(project, sourceSet, generateTaskName) !!
+        val generateExt = createConfigurationExtension(project, sourceSet, generateTaskName)
 
         val outputDir = project.file("gen/${sourceSet.name}")
 
-        val generateTask = project.tasks.create(generateTaskName, GenerateTask::class.java).apply {
+        val generateTask = project.tasks.register(generateTaskName, GenerateTask::class.java) {
             dependsOn(Callable { generateConfiguration })
             dependsOn(Callable { generatorSourceSet.classesTaskName })
-            classpath =
+            this.classpath =
                 project.files(Callable { generateConfiguration }, Callable { generatorSourceSet.runtimeClasspath })
             this.outputDir = outputDir
             container = generateExt
@@ -117,15 +119,15 @@ class CodegenPlugin : Plugin<Project> {
                                      .apply { builtBy(generateTask) })
 
         // Late bind the actual output directory
-        sourceSet.java.srcDir(Callable { generateTask.outputDir })
+        sourceSet.java.srcDir(generateTask.map { it.outputDir })
 
         project.configurations.getByName(sourceSet.implementationConfigurationName).extendsFrom(generateConfiguration)
 
         project.afterEvaluate {
-            generateConfiguration.files(closure { generateTask.outputDir })
+            generateConfiguration.incoming.artifactView {  }.files.plus(generateTask.map { it.outputDir })
 
             project.extensions.findByType(IdeaModel::class.java)?.let { ideaModel ->
-                ideaModel.module.generatedSourceDirs.add(project.file(generateTask.outputDir))
+                ideaModel.module.generatedSourceDirs.add(project.file(generateTask.map { it.outputDir }))
             }
 
             (project.tasks.getByName("clean") as? Delete)?.let { cleanTask ->
@@ -138,9 +140,17 @@ class CodegenPlugin : Plugin<Project> {
     private fun createConfigurationExtension(
         project: Project,
         sourceSet: SourceSet,
-        generateExtensionName: String?,
-    ): NamedDomainObjectContainer<GenerateSpec>? {
-        val generateExt = project.container(GenerateSpec::class.java)
+        generateExtensionName: String,
+    ): NamedDomainObjectContainer<GenerateSpec> {
+        val generateExt = project.objects.domainObjectContainer(GenerateSpec::class.java) {
+
+            GenerateSpec(it, project).apply {
+                input.unset()
+                generator.convention(project.provider { throw IllegalStateException("generator must be set") })
+                output.unset()
+                classpath.convention(project.files()) // empty classpath
+            }
+        }
 /*
         if (sourceSet is HasConvention) {
             sourceSet.convention.plugins.put("net.devrieze.gradlecodegen", GenerateSourceSet(generateExt))

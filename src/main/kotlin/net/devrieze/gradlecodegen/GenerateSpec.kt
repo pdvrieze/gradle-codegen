@@ -20,12 +20,18 @@
 
 package net.devrieze.gradlecodegen
 
+import org.gradle.api.Named
+import org.gradle.api.Project
 import org.gradle.api.file.FileCollection
+import org.gradle.api.provider.Property
+import org.gradle.kotlin.dsl.property
 import java.io.Serializable
 
-class GenerateSpec(val name: String): Serializable {
-    var output: String? = null
-    var generator: String? = null
-    var classpath: FileCollection? = null
-    var input: Any? = null
+class GenerateSpec(val _name: String, project: Project): Serializable, Named {
+    val output: Property<String> = project.objects.property()
+    val generator: Property<String> = project.objects.property()
+    val classpath: Property<FileCollection> = project.objects.property<FileCollection>().convention(project.files())
+    val input: Property<Any> = project.objects.property<Any>()
+
+    override fun getName(): String = _name
 }
