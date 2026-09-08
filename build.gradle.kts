@@ -20,6 +20,7 @@
 
 @file:Suppress("OPT_IN_USAGE")
 
+import org.gradle.plugin.devel.tasks.PluginUnderTestMetadata
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
@@ -42,6 +43,47 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
+val functionalTestPluginClasspath = configurations.create("functionalTestPluginClasspath")
+
+dependencies {
+    functionalTestPluginClasspath("org.jetbrains.kotlin:kotlin-gradle-plugin:${embeddedKotlinVersion}")
+}
+
+tasks.named<PluginUnderTestMetadata>("pluginUnderTestMetadata") {
+    pluginClasspath.from(functionalTestPluginClasspath)
+}
+
+testing {
+    suites {
+        val functionalTest = register("functionalTest", JvmTestSuite::class) {
+
+            useJUnitJupiter()
+
+//            testType = TestType.FUNCTIONAL_TESTING
+            dependencies {
+                implementation(gradleTestKit())
+                implementation("org.jetbrains.kotlin:kotlin-test-junit5:${embeddedKotlinVersion}")
+//                runtimeOnly("org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.10")
+//                runtimeOnly(libs.junit.engine)
+//                implementation(libs.junit.api)
+            }
+
+            targets.all {
+                testTask.configure {
+                    // Pass the functional test runtime classpath (which contains the Kotlin plugin) to the test JVM
+                    systemProperty("testClasspath", classpath.joinToString(File.pathSeparator))
+                }
+            }
+        }
+
+        // Link the functional test suite with our plugin's development configurations
+        gradlePlugin.testSourceSets.add(sourceSets.getByName(functionalTest.name))
+    }
+}
+
+tasks.named("check") {
+    dependsOn(tasks.named("functionalTest"))
+}
 kotlin {
     target {
         compilerOptions {
@@ -77,6 +119,11 @@ val kotlin_version: String = embeddedKotlinVersion
 
 dependencies {
     implementation(gradleApi())
+/*
+    "functionalTestImplementation"{
+        implementation("org.jetbrains.kotlin:kotlin-test:${embeddedKotlinVersion}")
+    }
+*/
 }
 
 repositories {

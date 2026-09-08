@@ -26,6 +26,7 @@ import org.gradle.api.InvalidUserCodeException
 import org.gradle.api.InvalidUserDataException
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.file.FileCollection
+import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
@@ -40,18 +41,27 @@ import java.net.URLClassLoader
 import java.util.*
 import java.util.concurrent.Callable
 
-open class GenerateTask : DefaultTask() {
+abstract class GenerateTask : DefaultTask() {
 
     init {
         group = "generate"
         outputs.upToDateWhen { task -> false } // do something smarter
     }
 
-    @OutputDirectory
-    var outputDir: Any = project.file(DEFAULT_GEN_DIR)
+    @get:OutputDirectory
+    abstract val outputDir: Property<File>// = project.file(DEFAULT_GEN_DIR)
 
     @get:InputFiles
-    var classpath: FileCollection? = null
+    abstract val classpath: Property<FileCollection>
+
+    @get:Input
+    abstract val output: Property<String>
+
+    @get:Input
+    abstract val generator: Property<String>
+
+    @get:Input
+    lateinit var input: Property<Any>
 
     @get:Input
     val dirGenerator = GenerateDirSpec()
@@ -63,11 +73,8 @@ open class GenerateTask : DefaultTask() {
     }
 
     fun classpath(params: Any) {
-        classpath = project.files(params)
+        classpath.set(project.files(params))
     }
-
-    @get:Input
-    internal lateinit var container: NamedDomainObjectContainer<GenerateSpec>
 
     /**
      * This performs the actual action of the task.
@@ -75,16 +82,18 @@ open class GenerateTask : DefaultTask() {
     @TaskAction
     fun generate() {
         URLClassLoader(combinedClasspath(null)).use { joinedLoader ->
-            container.configureEach {
-                val specClasspath = classpath.get()
 
-                if (specClasspath.isEmpty) {
-                    generateFile(this, joinedLoader)
-                } else {
-                    URLClassLoader(combinedClasspath(specClasspath)).use { classLoader ->
-                        generateFile(this, classLoader)
-                    }
+            val specClasspath = classpath.get()
+
+            if (specClasspath.isEmpty) {
+                generateFile( joinedLoader)
+            } else {
+                URLClassLoader(combinedClasspath(specClasspath)).use { classLoader ->
+                    generateFile(classLoader)
                 }
+            }
+
+            run {
             }
 
             if (dirGenerator.generator != null) {
@@ -125,9 +134,9 @@ open class GenerateTask : DefaultTask() {
         }
     }
 
-    private fun generateFile(spec: GenerateSpec, classLoader: ClassLoader) {
-        val outputProp = spec.output
-        val generatorProp = spec.generator
+    private fun generateFile(classLoader: ClassLoader) {
+        val outputProp = output
+        val generatorProp = generator
         if (outputProp.isPresent) {
         val specOutput = outputProp.get()
             val outFile = resolveFile(specOutput)
@@ -143,9 +152,9 @@ open class GenerateTask : DefaultTask() {
                 if (!outFile.canWrite()) throw InvalidUserDataException("The output file ($outFile) is not writeable.")
 
                 if (project.logger.isInfoEnabled) {
-                    project.logger.info("Generating ${spec._name} as '$specOutput' as '$outFile'")
+                    project.logger.info("Generating ${gname} as '$specOutput' as '$outFile'")
                 } else {
-                    project.logger.lifecycle("Generating ${spec._name} as '$specOutput'")
+                    project.logger.lifecycle("Generating ${gname} as '$specOutput'")
                 }
 
                 val baseError = """
@@ -153,10 +162,10 @@ open class GenerateTask : DefaultTask() {
               where the second parameter is optional iff the input is null. If not a static
               method, the class must have a noArg constructor.""".trimIndent()
 
-                generatorClass.execute({ outFile.writer() }, spec.input, baseError)
+                generatorClass.execute({ outFile.writer() }, input, baseError)
 
             } else {
-                throw InvalidUserDataException("Missing output code for generateSpec ${spec._name}, no generator provided")
+                throw InvalidUserDataException("Missing output code for generateTask ${name}, no generator provided")
             }
         }
     }
@@ -235,7 +244,7 @@ open class GenerateTask : DefaultTask() {
         fun Iterable<File>.toUrls(): Sequence<URL> = asSequence().map { it.toURI().toURL() }
 
         return mutableListOf<URL>().apply {
-            classpath?.let { it.toUrls().forEach { add(it) } }
+            classpath.orNull?.let { it.toUrls().forEach { add(it) } }
             others?.let { it.toUrls().forEach { add(it) } }
         }.toTypedArray().apply { project.logger.debug("Classpath for generator: ${Arrays.toString(this)}") }
     }

@@ -24,20 +24,20 @@ import groovy.lang.Closure
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.plugins.JavaBasePlugin
+import org.gradle.api.file.SourceDirectorySet
+import org.gradle.api.plugins.ExtensionAware
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.SourceSetContainer
-import org.gradle.kotlin.dsl.domainObjectContainer
+import org.gradle.kotlin.dsl.withType
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import java.io.File
 import java.io.Writer
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
-import java.util.Locale
-import java.util.Locale.getDefault
 import java.util.concurrent.Callable
+import kotlin.jvm.java
 
 val Project.sourceSets: SourceSetContainer
     get() = project.extensions.getByType(JavaPluginExtension::class.java).sourceSets
@@ -70,70 +70,60 @@ const val DEFAULT_GEN_DIR = "gen"
 class CodegenPlugin : Plugin<Project> {
 
     override fun apply(project: Project) {
-        project.plugins.apply(JavaBasePlugin::class.java)
+        project.pluginManager.withPlugin("java") {
+            val specContainer = project.objects.domainObjectContainer(GenerateSpec::class.java)
+            project.extensions.add("generate", specContainer)
 
-        val sourceSetsToSkip = mutableSetOf("generators")
-        project.sourceSets.configureEach { val sourceSet = this
-            if (sourceSet.name !in sourceSetsToSkip) {
-                if (sourceSet.name.lowercase().endsWith("generators")) {
-                    project.logger.error("Generators sourceSet (${sourceSet.name}) not registered in $sourceSetsToSkip")
-                } else {
-                    processSourceSet(project, sourceSet, sourceSetsToSkip)
-                    project.logger.debug("sourceSetsToSkip is now: {}", sourceSetsToSkip)
-                }
+            specContainer.configureEach {
+                processSourceSet(project, this)
             }
 
         }
 
-
 //    project.logger.lifecycle("Welcome to the kotlinsql builder plugin")
     }
 
-    private fun processSourceSet(project: Project, sourceSet: SourceSet, doSkip: MutableSet<String>) {
-        val generateTaskName = if (sourceSet.name == "main") "generate" else sourceSet.getTaskName("generate", null)
-
-        val generateConfiguration = project.configurations.maybeCreate(generateTaskName)
-        project.configurations.add(generateConfiguration)
-
-        val generatorSourceSetName = if (sourceSet.name == "main") "generators" else "${sourceSet.name}Generators"
-        doSkip.add(generatorSourceSetName)
-
-        val generatorSourceSet = project.sourceSets.maybeCreate(generatorSourceSetName)
-
-        val generateExt = createConfigurationExtension(project, sourceSet, generateTaskName)
-
-        val outputDir = project.file("gen/${sourceSet.name}")
-
-        val generateTask = project.tasks.register(generateTaskName, GenerateTask::class.java) {
-            dependsOn(Callable { generateConfiguration })
-            dependsOn(Callable { generatorSourceSet.classesTaskName })
-            this.classpath =
-                project.files(Callable { generateConfiguration }, Callable { generatorSourceSet.runtimeClasspath })
-            this.outputDir = outputDir
-            container = generateExt
-        }
+    private fun processSourceSet(project: Project, generateSpec: GenerateSpec) {
+        val generateName = generateSpec.name
+        val targetSourceSetName = generateSpec.targetSourceSet.get()
 
 
-        project.dependencies.add(sourceSet.implementationConfigurationName,
-                                 project.files(Callable { generateConfiguration.files })
-                                     .apply { builtBy(generateTask) })
+        project.sourceSets.named(targetSourceSetName) {
+            val targetSourceSet = this
+            val generateTaskName = if (targetSourceSetName == "main") "generate" else targetSourceSet.getTaskName("generate", null)
+            val generateConfiguration = project.configurations.maybeCreate(generateTaskName)
+            val generatorSourceSetName = if (generateName == "main") "generators" else "${generateName}Generators"
+            val generatorSourceSet = project.sourceSets.register(generatorSourceSetName)
 
-        // Late bind the actual output directory
-        sourceSet.java.srcDir(generateTask.map { it.outputDir })
+            val outputDir = project.file("gen/$generateName")
 
-        project.configurations.getByName(sourceSet.implementationConfigurationName).extendsFrom(generateConfiguration)
+            val generateTask = project.tasks.register(generateTaskName, GenerateTask::class.java) {
+                dependsOn(Callable { generateConfiguration })
+                dependsOn(generatorSourceSet.map { it.classesTaskName })
+                classpath.set(project.files(Callable { generateConfiguration }, generatorSourceSet.map { it.runtimeClasspath }))
+                this.outputDir.set(outputDir)
+            }
 
-        project.afterEvaluate {
+            project.dependencies.add(generateTaskName,                                  project.files(Callable { generateConfiguration.files })
+                .apply { builtBy(generateTask) })
+
+            // Late bind the actual output directory
+            when (val ktExt = (targetSourceSet as? ExtensionAware)?.extensions?.findByName("kotlin")) {
+                is SourceDirectorySet -> ktExt.srcDir(generateTask.map { it.outputDir })
+                else -> targetSourceSet.java.srcDir(generateTask.map { it.outputDir })
+            }
+
+            project.configurations.getByName(targetSourceSet.implementationConfigurationName).extendsFrom(generateConfiguration)
+
             generateConfiguration.incoming.artifactView {  }.files.plus(generateTask.map { it.outputDir })
 
             project.extensions.findByType(IdeaModel::class.java)?.let { ideaModel ->
                 ideaModel.module.generatedSourceDirs.add(project.file(generateTask.map { it.outputDir }))
             }
 
-            (project.tasks.getByName("clean") as? Delete)?.let { cleanTask ->
-                cleanTask.delete(outputDir)
+            project.tasks.matching { it.name == "clean" }.withType<Delete>().configureEach {
+                delete(outputDir)
             }
-
         }
     }
 

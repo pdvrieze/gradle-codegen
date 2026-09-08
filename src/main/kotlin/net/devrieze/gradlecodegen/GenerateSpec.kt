@@ -28,6 +28,7 @@ import org.gradle.kotlin.dsl.property
 import java.io.Serializable
 
 class GenerateSpec(val _name: String, project: Project): Serializable, Named {
+    val targetSourceSet: Property<String> = project.objects.property<String>().convention(_name)
     val output: Property<String> = project.objects.property()
     val generator: Property<String> = project.objects.property()
     val classpath: Property<FileCollection> = project.objects.property<FileCollection>().convention(project.files())
