@@ -27,6 +27,7 @@ import org.gradle.api.InvalidUserDataException
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileCollection
 import org.gradle.api.provider.Property
+import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
@@ -41,6 +42,7 @@ import java.net.URLClassLoader
 import java.util.*
 import java.util.concurrent.Callable
 
+@CacheableTask
 abstract class GenerateTask : DefaultTask() {
 
     init {
@@ -51,7 +53,7 @@ abstract class GenerateTask : DefaultTask() {
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty// = project.file(DEFAULT_GEN_DIR)
 
-    @get:InputFiles
+    @get:Input
     abstract val classpath: Property<FileCollection>
 
     @get:Input
