@@ -24,20 +24,18 @@ import groovy.lang.Closure
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.file.SourceDirectorySet
-import org.gradle.api.plugins.ExtensionAware
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.kotlin.dsl.withType
 import org.gradle.plugins.ide.idea.model.IdeaModel
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.io.File
 import java.io.Writer
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.util.concurrent.Callable
-import kotlin.jvm.java
 
 val Project.sourceSets: SourceSetContainer
     get() = project.extensions.getByType(JavaPluginExtension::class.java).sourceSets
@@ -47,7 +45,7 @@ operator fun SourceSetContainer.get(name: String): SourceSet = getByName(name)
 internal val Method.parameterCountCompat: Int get() = parameterTypes.size
 
 fun Method.doInvoke(receiver: Class<out Any>, firstParam: Any, input: Any?) {
-    val generatorInst = if (Modifier.isStatic(modifiers)) null else receiver.newInstance()
+    val generatorInst = if (Modifier.isStatic(modifiers)) null else receiver.getDeclaredConstructor().newInstance()
 
     val body = { output: Any ->
         if (this.parameterCountCompat == 1) {
@@ -67,14 +65,20 @@ fun Method.doInvoke(receiver: Class<out Any>, firstParam: Any, input: Any?) {
 
 const val DEFAULT_GEN_DIR = "gen"
 
+inline fun NamedDomainObjectContainer<GenerateSpec>.main(
+    crossinline configure: GenerateSpec.() -> Unit
+) = register("main") { configure() }
+
 class CodegenPlugin : Plugin<Project> {
 
     override fun apply(project: Project) {
         project.pluginManager.withPlugin("java") {
+            project.logger.trace("Applying CodegenPlugin (after Java found)")
             val specContainer = project.objects.domainObjectContainer(GenerateSpec::class.java)
             project.extensions.add("generate", specContainer)
 
-            specContainer.configureEach {
+            specContainer.all {
+                project.logger.trace("Configuring codegen ($name)")
                 processSourceSet(project, this)
             }
 
@@ -88,29 +92,31 @@ class CodegenPlugin : Plugin<Project> {
         val targetSourceSetName = generateSpec.targetSourceSet.get()
 
 
+        val generatorSourceSetName = if (generateName == "main") "generators" else "${generateName}Generators"
+        val generatorSourceSet = project.sourceSets.register(generatorSourceSetName)
+
+        val generateTaskName = if (targetSourceSetName == "main") "generate" else "${targetSourceSetName}Generate"
+        val generateConfiguration = project.configurations.maybeCreate(generateTaskName)
         project.sourceSets.named(targetSourceSetName) {
             val targetSourceSet = this
-            val generateTaskName = if (targetSourceSetName == "main") "generate" else targetSourceSet.getTaskName("generate", null)
-            val generateConfiguration = project.configurations.maybeCreate(generateTaskName)
-            val generatorSourceSetName = if (generateName == "main") "generators" else "${generateName}Generators"
-            val generatorSourceSet = project.sourceSets.register(generatorSourceSetName)
 
             val outputDir = project.file("gen/$generateName")
 
             val generateTask = project.tasks.register(generateTaskName, GenerateTask::class.java) {
                 dependsOn(Callable { generateConfiguration })
                 dependsOn(generatorSourceSet.map { it.classesTaskName })
-                classpath.set(project.files(Callable { generateConfiguration }, generatorSourceSet.map { it.runtimeClasspath }))
+                this.classpath.set(project.files(Callable { generateConfiguration }, generatorSourceSet.map { it.runtimeClasspath }))
                 this.outputDir.set(outputDir)
+                this.output.set(generateSpec.output)
+                this.input.set(generateSpec.input)
+                this.generator.set(generateSpec.generator)
+                project.logger.info("Generate task $name configured")
             }
 
-            project.dependencies.add(generateTaskName,                                  project.files(Callable { generateConfiguration.files })
-                .apply { builtBy(generateTask) })
+            targetSourceSet.java.srcDir(generateTask.flatMap { it.outputDir })
 
-            // Late bind the actual output directory
-            when (val ktExt = (targetSourceSet as? ExtensionAware)?.extensions?.findByName("kotlin")) {
-                is SourceDirectorySet -> ktExt.srcDir(generateTask.map { it.outputDir })
-                else -> targetSourceSet.java.srcDir(generateTask.map { it.outputDir })
+            project.tasks.matching { it.name == "compileKotlin" }.withType(KotlinCompile::class).configureEach {
+                this.doFirst { project.logger.lifecycle("Compiling Kotlin (${javaClass}) sources from: ${this}/${targetSourceSet.allSource.files}") }
             }
 
             project.configurations.getByName(targetSourceSet.implementationConfigurationName).extendsFrom(generateConfiguration)
@@ -125,30 +131,6 @@ class CodegenPlugin : Plugin<Project> {
                 delete(outputDir)
             }
         }
-    }
-
-    private fun createConfigurationExtension(
-        project: Project,
-        sourceSet: SourceSet,
-        generateExtensionName: String,
-    ): NamedDomainObjectContainer<GenerateSpec> {
-        val generateExt = project.objects.domainObjectContainer(GenerateSpec::class.java) {
-
-            GenerateSpec(it, project).apply {
-                input.unset()
-                generator.convention(project.provider { throw IllegalStateException("generator must be set") })
-                output.unset()
-                classpath.convention(project.files()) // empty classpath
-            }
-        }
-/*
-        if (sourceSet is HasConvention) {
-            sourceSet.convention.plugins.put("net.devrieze.gradlecodegen", GenerateSourceSet(generateExt))
-        } else {
-*/
-            sourceSet.extensions.add(generateExtensionName, generateExt)
-//        }
-        return generateExt
     }
 
 }

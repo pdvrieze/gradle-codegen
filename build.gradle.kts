@@ -46,6 +46,8 @@ java {
 val functionalTestPluginClasspath = configurations.create("functionalTestPluginClasspath")
 
 dependencies {
+    compileOnly("org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.10")
+
     functionalTestPluginClasspath("org.jetbrains.kotlin:kotlin-gradle-plugin:${embeddedKotlinVersion}")
 }
 

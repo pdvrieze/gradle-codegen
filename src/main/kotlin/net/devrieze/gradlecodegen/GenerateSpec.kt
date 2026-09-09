@@ -27,7 +27,7 @@ import org.gradle.api.provider.Property
 import org.gradle.kotlin.dsl.property
 import java.io.Serializable
 
-class GenerateSpec(val _name: String, project: Project): Serializable, Named {
+abstract class GenerateSpec(val _name: String, project: Project): Serializable, Named {
     val targetSourceSet: Property<String> = project.objects.property<String>().convention(_name)
     val output: Property<String> = project.objects.property()
     val generator: Property<String> = project.objects.property()

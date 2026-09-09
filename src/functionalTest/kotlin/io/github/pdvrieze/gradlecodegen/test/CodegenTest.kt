@@ -21,10 +21,13 @@
 package io.github.pdvrieze.gradlecodegen.test
 
 import org.gradle.testkit.runner.GradleRunner
+import org.gradle.testkit.runner.TaskOutcome
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class GreetingPluginFunctionalTest {
@@ -36,7 +39,7 @@ class GreetingPluginFunctionalTest {
 
     @AfterTest
     fun cleanup() {
-//        testProjectDir.deleteRecursively()
+        testProjectDir.deleteRecursively()
     }
 
     @BeforeTest
@@ -45,23 +48,46 @@ class GreetingPluginFunctionalTest {
         testProjectDir = Files.createTempDirectory("gradle-functional-test").toFile()
         settingsFile = File(testProjectDir, "settings.gradle.kts")
         buildFile = File(testProjectDir, "build.gradle.kts")
-        val generateSourceSet = testProjectDir.resolve("src/mainGenerate/kotlin/")
-        generateSource = generateSourceSet.resolve("org.example.generators.MyGenerator.kt")
+        // Dynamically configure a synthetic build project using the plugin id
+        buildFile.writeText("""
+            plugins {
+                java
+                id("org.jetbrains.kotlin.jvm")
+                id("net.devrieze.gradlecodegen")
+            }
+            
+            generate {
+                this.register("main") {
+                    output = "org/example/outputpackage/GeneratedClass.kt"
+                    generator = "org.example.generators.MyGenerator"
+                    input = "hello generate plugin!"
+                }                
+            }
+           
+            repositories {
+                mavenCentral()
+            }
+            
+        """.trimIndent())
+
+
+        val generateSourceSet = testProjectDir.resolve("src/generators/kotlin/")
+        generateSource = generateSourceSet.resolve("org/example/generators/MyGenerator.kt")
 
         settingsFile.writeText("""
             rootProject.name = "test-sandbox"
             """.trimIndent())
 
-        generateSourceSet.mkdirs()
+        generateSource.parentFile.mkdirs()
         generateSource.writeText("""
             package org.example.generators
                      
             class MyGenerator {
-                fun doGenerate(target: Appendable, param: String) {
+                fun doGenerate(target: Appendable, param: Any) {
                     target.append("package org.example.outputpackage\n\n")
                     target.append("object GeneratedClass {\n")
                     target.append("    fun hello() {\n")
-                    target.append("        println(param)\n")
+                    target.append("        println(\"${'$'}param\")\n")
                     target.append("    }\n")
                     target.append("}\n")
                 }
@@ -72,39 +98,62 @@ class GreetingPluginFunctionalTest {
     }
 
     @org.junit.jupiter.api.Test
-    fun `plugin registers hello task and runs successfully`() {
-        // Dynamically configure a synthetic build project using the plugin id
-        buildFile.writeText("""
-            plugins {
-                java
-                id("org.jetbrains.kotlin.jvm")
-                id("net.devrieze.gradlecodegen")
-            }
-            
-            generate {
-                register("main") {
-                    output = "kotlin/org/example/outputpackage/GeneratedClass.kt"
-                    generator = "org.example.generators.MyGenerator"
-                    input = "hello generate plugin!"
-                }                
-            }
-           
-            
-        """.trimIndent())
-
-        val testClasspath = System.getProperty("testClasspath")
-            .split(File.pathSeparator)
-            .map { File(it) }
+    fun `Create generator`() {
 
         // Run the runner lifecycle targeting our generated structure
         val result = GradleRunner.create()
             .withProjectDir(testProjectDir)
-            .withArguments("tasks", "--stacktrace")
+            .withArguments("--info","--stacktrace", "generatorsClasses")
             .withPluginClasspath(/*testClasspath*/) // Automatic mapping of binary distributions to the sub-build
             .forwardOutput()
             .build()
 
-        // Assert build log behaviors
-//        assertTrue(result.output.contains("Hello from the custom Gradle 9 plugin!"))
+        val compileTask = assertNotNull(result.tasks.find { it.path == ":compileGeneratorsKotlin" })
+        assertEquals(TaskOutcome.SUCCESS, compileTask.outcome)
+    }
+
+    @org.junit.jupiter.api.Test
+    fun `Create simple file`() {
+
+        // Run the runner lifecycle targeting our generated structure
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("--stacktrace", "generate")
+            .withPluginClasspath(/*testClasspath*/) // Automatic mapping of binary distributions to the sub-build
+            .forwardOutput()
+            .build()
+
+        val compileTask = assertNotNull(result.tasks.find { it.path == ":compileGeneratorsKotlin" })
+        assertEquals(TaskOutcome.SUCCESS, compileTask.outcome)
+
+        val genClassesTask = assertNotNull(result.tasks.find { it.path == ":generatorsClasses" })
+        assertEquals(TaskOutcome.UP_TO_DATE, genClassesTask.outcome)
+
+        val generatedFile = testProjectDir.resolve("gen/main/org/example/outputpackage/GeneratedClass.kt")
+        assertTrue(generatedFile.exists())
+        assertTrue(generatedFile.readLines().isNotEmpty())
+    }
+
+    @org.junit.jupiter.api.Test
+    fun `Call simple generated class from simple main class`() {
+        val useFile = testProjectDir.resolve("src/main/kotlin/org/example/Main.kt")
+        useFile.parentFile.mkdirs()
+        useFile.writeText("""
+            package org.example
+            
+            import org.example.outputpackage.GeneratedClass
+            
+            fun main() {
+                GeneratedClass.hello()
+            }
+        """.trimIndent())
+
+        // Run the runner lifecycle targeting our generated structure
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("--stacktrace", "assemble")
+            .withPluginClasspath(/*testClasspath*/) // Automatic mapping of binary distributions to the sub-build
+            .forwardOutput()
+            .build()
     }
 }
