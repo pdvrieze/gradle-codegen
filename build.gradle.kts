@@ -33,7 +33,7 @@ plugins {
 }
 
 version = "0.7.1"
-group = "net.devrieze"
+group = "net.devrieze.gradlecodegen"
 
 base {
     archivesName.set("gradlecodegen")
@@ -86,6 +86,7 @@ testing {
 tasks.named("check") {
     dependsOn(tasks.named("functionalTest"))
 }
+
 kotlin {
     target {
         compilerOptions {
